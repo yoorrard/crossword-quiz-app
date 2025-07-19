@@ -1,0 +1,3937 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>가로세로 낱말퀴즈 놀이터</title>
+    
+    <!-- SEO 메타데이터 -->
+    <meta name="description" content="교사용 가로세로 낱말퀴즈 제작 및 학생용 풀이 웹앱. 엑셀 업로드, QR코드 공유, 자동 배치 기능 지원.">
+    <meta name="keywords" content="낱말퀴즈, 가로세로퀴즈, 교육, 교사, 학생, 웹앱, 퀴즈제작">
+    <meta name="author" content="CrosswordMaker">
+    
+    <!-- Open Graph (소셜 미디어 공유) -->
+    <meta property="og:title" content="가로세로 낱말퀴즈 놀이터">
+    <meta property="og:description" content="교사와 학생을 위한 낱말퀴즈 제작 및 풀이 도구">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧩</text></svg>">
+    
+    <!-- 파비콘 -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧩</text></svg>">
+    
+    <!-- SheetJS for Excel file processing -->
+    <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <!-- Supabase 클라이언트 라이브러리 -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    
+    <!-- QR 코드 생성을 위한 개선된 함수 -->
+    <script>
+        // 🚀 개선된 QR 코드 생성 함수 (여러 방법 지원)
+        window.generateQRCode = function(text, canvas, options = {}) {
+            console.log('🎯 QR 코드 생성 시작:', text);
+            
+            const size = options.width || 160;
+            const margin = options.margin || 0;
+            
+            // 방법 1: QR Server API 시도 (더 안정적)
+            function tryQRServerAPI() {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                // QR Server API - 더 안정적이고 빠름
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&format=png&margin=${margin}`;
+                
+                img.onload = function() {
+                    try {
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = size;
+                        canvas.height = size;
+                        
+                        // 배경 색상 설정
+                        ctx.fillStyle = options.color?.light || '#FFFFFF';
+                        ctx.fillRect(0, 0, size, size);
+                        
+                        // QR 코드 이미지 그리기
+                        ctx.drawImage(img, 0, 0, size, size);
+                        
+                        console.log('✅ QR 코드 생성 성공! (QR Server API)');
+                        console.log('📱 QR 코드를 스캔하면 자동으로 퀴즈가 로드됩니다');
+                        
+                        if (options.onSuccess) options.onSuccess();
+                    } catch (error) {
+                        console.error('❌ QR Server API 그리기 오류:', error);
+                        tryGoogleChartsAPI(); // 폴백
+                    }
+                };
+                
+                img.onerror = function() {
+                    console.warn('⚠️ QR Server API 실패, Google Charts API 시도...');
+                    tryGoogleChartsAPI(); // 폴백
+                };
+                
+                img.src = qrUrl;
+            }
+            
+            // 방법 2: Google Charts API 폴백
+            function tryGoogleChartsAPI() {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                const qrUrl = `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encodeURIComponent(text)}&choe=UTF-8`;
+                
+                img.onload = function() {
+                    try {
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = size;
+                        canvas.height = size;
+                        
+                        ctx.fillStyle = options.color?.light || '#FFFFFF';
+                        ctx.fillRect(0, 0, size, size);
+                        ctx.drawImage(img, 0, 0, size, size);
+                        
+                        console.log('✅ QR 코드 생성 성공! (Google Charts API)');
+                        if (options.onSuccess) options.onSuccess();
+                    } catch (error) {
+                        console.error('❌ Google Charts API 그리기 오류:', error);
+                        createFallbackQR(); // 최종 폴백
+                    }
+                };
+                
+                img.onerror = function() {
+                    console.warn('⚠️ Google Charts API도 실패, 대체 QR 코드 생성...');
+                    createFallbackQR(); // 최종 폴백
+                };
+                
+                img.src = qrUrl;
+            }
+            
+            // 방법 3: 대체 QR 코드 (최종 폴백)
+            function createFallbackQR() {
+                try {
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = size;
+                    canvas.height = size;
+                    
+                    // 배경
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, size, size);
+                    
+                    // 테두리
+                    ctx.strokeStyle = '#333333';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(8, 8, size-16, size-16);
+                    
+                    // QR 패턴 (간단한 픽셀 아트)
+                    ctx.fillStyle = '#333333';
+                    const unit = Math.floor((size - 20) / 15);
+                    for (let i = 0; i < 15; i++) {
+                        for (let j = 0; j < 15; j++) {
+                            if ((i + j) % 3 === 0 || (i % 4 === 0 && j % 4 === 0)) {
+                                ctx.fillRect(10 + i * unit, 10 + j * unit, unit-1, unit-1);
+                            }
+                        }
+                    }
+                    
+                    // 중앙 아이콘
+                    ctx.fillStyle = '#2196F3';
+                    ctx.font = `bold ${Math.floor(size/8)}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.fillText('QR', size/2, size/2 + size/32);
+                    
+                    console.log('✅ 대체 QR 코드 생성 완료!');
+                    console.log('💡 인터넷 연결을 확인하고 다시 시도해보세요');
+                    if (options.onSuccess) options.onSuccess();
+                } catch (error) {
+                    console.error('❌ 대체 QR 코드 생성도 실패:', error);
+                    if (options.onError) options.onError(error);
+                }
+            }
+            
+            // QR 코드 생성 시작 (가장 안정적인 방법부터)
+            tryQRServerAPI();
+        };
+        
+        console.log('📚 개선된 QR 코드 생성 함수 로딩 완료 (다중 API + 폴백 지원)');
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', 'Malgun Gothic', '맑은 고딕', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            padding: 10px;
+            margin: 0;
+            overflow-x: hidden; /* 가로 스크롤 방지 */
+            box-sizing: border-box;
+        }
+        
+        html {
+            overflow-x: hidden; /* 가로 스크롤 방지 */
+            box-sizing: border-box;
+        }
+        
+        .container {
+            max-width: 100vw;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+            }
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: clamp(15px, 4vw, 30px);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                margin: 5px;
+                border-radius: 15px;
+                padding: 15px;
+            }
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: clamp(20px, 5vw, 30px);
+            padding-bottom: clamp(15px, 3vw, 20px);
+            border-bottom: 3px solid #667eea;
+            background: linear-gradient(135deg, #f8faff 0%, #e8f2ff 100%);
+            margin: -30px -30px 30px -30px;
+            padding: 30px;
+            position: relative;
+        }
+        
+        @media (max-width: 768px) {
+            .header {
+                margin: -15px -15px 20px -15px;
+                padding: 20px 15px;
+            }
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2, #667eea);
+            animation: shimmer 3s ease-in-out infinite;
+        }
+        
+        @keyframes shimmer {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            font-size: clamp(1.8rem, 5vw, 2.5rem);
+            margin-bottom: 15px;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        
+        .mode-badge {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            display: inline-block;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+            font-weight: 600;
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .mode-badge:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
+        }
+        
+        .mode-badge:active {
+            transform: translateY(0);
+        }
+        
+        .mode-badge::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .mode-badge:hover::before {
+            left: 100%;
+        }
+        
+        @media (max-width: 768px) {
+            .mode-badge {
+                padding: 10px 20px;
+                font-size: 0.9rem;
+            }
+        }
+        
+        .quiz-title {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 18px;
+            margin-bottom: 30px;
+            transition: border-color 0.3s ease;
+        }
+        
+        .quiz-title:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: clamp(20px, 4vw, 40px);
+        }
+        
+        @media (max-width: 1024px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .main-layout {
+                gap: 15px;
+            }
+        }
+        
+        .word-panel {
+            background: linear-gradient(135deg, #f8faff 0%, #fff 100%);
+            padding: clamp(15px, 3vw, 25px);
+            border-radius: 20px;
+            border: 1px solid rgba(102, 126, 234, 0.15);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+            height: fit-content;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .word-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+        
+        .word-panel:hover {
+            box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+            transform: translateY(-2px);
+        }
+        
+        .panel-title {
+            font-size: clamp(1.2rem, 3vw, 1.4rem);
+            color: #2c3e50;
+            margin-bottom: clamp(15px, 3vw, 20px);
+            margin-top: 8px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: -0.5px;
+        }
+        
+        .panel-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 2px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        .form-input, .form-select {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e8eaff;
+            border-radius: 12px;
+            font-size: clamp(13px, 2.5vw, 14px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: linear-gradient(135deg, #fff 0%, #f8faff 100%);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        
+        .form-input:focus, .form-select:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+            background: #fff;
+            transform: translateY(-1px);
+        }
+        
+        .form-input:hover, .form-select:hover {
+            border-color: #a8b5ff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: clamp(12px, 2.5vw, 14px);
+            letter-spacing: 0.3px;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: clamp(12px, 2.5vw, 14px);
+            font-weight: 600;
+            margin: 5px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.25);
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 0.5px;
+        }
+        
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .btn:hover::before {
+            left: 100%;
+        }
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.35);
+        }
+        
+        .btn:active {
+            transform: translateY(-1px);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.25);
+        }
+        
+        .btn-success:hover {
+            box-shadow: 0 10px 30px rgba(76, 175, 80, 0.35);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d, #5a6268);
+            box-shadow: 0 6px 20px rgba(108, 117, 125, 0.25);
+        }
+        
+        .btn-secondary:hover {
+            box-shadow: 0 10px 30px rgba(108, 117, 125, 0.35);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #2196F3, #1976d2);
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.25);
+        }
+        
+        .btn-primary:hover {
+            box-shadow: 0 10px 30px rgba(33, 150, 243, 0.35);
+        }
+        
+        @media (max-width: 768px) {
+            .btn {
+                padding: 10px 16px;
+                font-size: 12px;
+                margin: 3px;
+            }
+        }
+        
+        .btn-success {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(45deg, #6c757d, #5a6268);
+            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+        }
+        
+        .grid-panel {
+            background: linear-gradient(135deg, #fff 0%, #f8faff 100%);
+            padding: clamp(15px, 3vw, 25px);
+            border-radius: 20px;
+            border: 1px solid rgba(102, 126, 234, 0.15);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .grid-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #764ba2, #667eea);
+        }
+        
+        .grid-panel:hover {
+            box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+            transform: translateY(-2px);
+        }
+        
+        .grid-controls {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .grid-size-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #e8eaff;
+        }
+        
+        .size-input {
+            width: 60px;
+            padding: 8px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .grid-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        
+        .grid {
+            display: grid;
+            gap: 2px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .cell {
+            width: 40px;
+            height: 40px;
+            border: 2px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-radius: 4px;
+        }
+        
+        /* 모바일 반응형 - 그리드 최적화 */
+        @media (max-width: 768px) {
+            .cell {
+                width: calc((100vw - 80px) / 10 - 3px);
+                height: calc((100vw - 80px) / 10 - 3px);
+                min-width: 25px;
+                min-height: 25px;
+                max-width: 35px;
+                max-height: 35px;
+                font-size: 12px;
+                border-width: 1px;
+            }
+            
+            .grid {
+                padding: 10px;
+                gap: 1px;
+                overflow-x: auto;
+                max-width: 100%;
+            }
+            
+            .grid-container {
+                margin: 10px 0;
+                padding: 0 10px;
+                overflow-x: auto;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .cell {
+                width: calc((100vw - 60px) / 10 - 2px);
+                height: calc((100vw - 60px) / 10 - 2px);
+                min-width: 22px;
+                min-height: 22px;
+                max-width: 30px;
+                max-height: 30px;
+                font-size: 11px;
+                border-width: 1px;
+            }
+            
+            .grid {
+                padding: 5px;
+                gap: 1px;
+            }
+            
+            .grid-container {
+                margin: 5px 0;
+                padding: 0 5px;
+            }
+        }
+        
+        /* 풀이 모드 반응형 최적화 */
+        .solve-grid {
+            margin: 0 auto;
+            justify-self: center;
+            width: fit-content;
+            /* 크기는 JavaScript에서 동적으로 설정 */
+        }
+        
+        .solve-grid .cell {
+            width: 100%;
+            height: 100%;
+            aspect-ratio: 1;
+            min-width: 20px;
+            min-height: 20px;
+        }
+        
+        /* 그리드 컨테이너 중앙 정렬 강화 */
+        #gridContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            width: fit-content;
+        }
+        
+        /* 풀이 화면 레이아웃 기본 스타일 - 완전 반응형 */
+        .solve-layout {
+            display: grid;
+            grid-template-columns: minmax(300px, 580px) minmax(300px, 420px);
+            gap: clamp(15px, 2vw, 25px);
+            margin: clamp(10px, 1.5vw, 20px) auto 0;
+            justify-content: center;
+            align-items: start;
+            width: 100%;
+            max-width: 1050px;
+            padding: 0 clamp(10px, 2vw, 15px);
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        
+        /* 그리드 컨테이너 완전 반응형 */
+        .solve-grid-container {
+            width: 100%;
+            max-width: 580px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: clamp(12px, 2.2vw, 20px);
+            background: #f8f9fa;
+            border-radius: clamp(10px, 1.8vw, 14px);
+            box-sizing: border-box;
+            border: 1px solid #e8ecef;
+            overflow: hidden;
+        }
+        
+        /* 동적 그리드 스타일 */
+        .solve-grid {
+            display: grid;
+            gap: clamp(1px, 0.2vw, 3px);
+            justify-content: center;
+            align-content: center;
+            width: fit-content;
+            margin: clamp(10px, 2vw, 20px) auto clamp(15px, 2.5vw, 25px);
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        
+        /* 동적 셀 스타일 */
+        .solve-grid .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            font-size: var(--cell-font-size);
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: clamp(1px, 0.1vw, 2px) solid #333;
+            border-radius: clamp(2px, 0.3vw, 4px);
+            box-sizing: border-box;
+            transition: all 0.2s ease;
+            position: relative;
+            background: white;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        /* 셀 숫자 스타일 */
+        .solve-grid .cell::before {
+            content: attr(data-number);
+            position: absolute;
+            top: clamp(1px, 0.2vw, 2px);
+            left: clamp(1px, 0.2vw, 2px);
+            font-size: var(--cell-number-size);
+            color: #666;
+            font-weight: normal;
+            line-height: 1;
+        }
+        
+        /* 단어 설명 영역 완전 반응형 */
+        .word-clues-section {
+            width: 100%;
+            max-width: 420px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            background: #f8f9fa;
+            border-radius: clamp(10px, 1.8vw, 14px);
+            padding: clamp(12px, 2.2vw, 20px);
+            box-sizing: border-box;
+            border: 1px solid #e8ecef;
+            overflow: hidden;
+        }
+        
+        /* 탭 네비게이션 스타일 */
+        .clues-tabs {
+            display: flex;
+            background: #e8f4fd;
+            border-radius: clamp(10px, 1.8vw, 14px);
+            padding: clamp(5px, 1vw, 8px);
+            margin-bottom: clamp(18px, 3vw, 25px);
+            gap: clamp(5px, 1vw, 8px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .clues-tab {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: clamp(10px, 2vw, 14px) clamp(12px, 2.5vw, 16px);
+            border-radius: clamp(6px, 1vw, 8px);
+            font-size: clamp(12px, 2.5vw, 14px);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: clamp(4px, 0.8vw, 6px);
+            color: #64748b;
+        }
+        
+        .clues-tab.active {
+            background: white;
+            color: #1e40af;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+        }
+        
+        .clues-tab:hover:not(.active) {
+            background: rgba(255,255,255,0.6);
+            color: #475569;
+        }
+        
+        .clues-tab-icon {
+            font-size: clamp(14px, 3vw, 16px);
+        }
+        
+        /* 탭 콘텐츠 영역 */
+        .clues-tab-content {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            max-height: calc(70vh - 130px);
+            margin-bottom: clamp(12px, 2.2vw, 16px);
+            scrollbar-width: thin;
+            scrollbar-color: #c1c1c1 #f1f1f1;
+            border: 1px solid #e0e0e0;
+            border-radius: clamp(8px, 1.2vw, 10px);
+            padding: clamp(10px, 2vw, 14px);
+            background: #fafafa;
+            box-sizing: border-box;
+        }
+        
+        .clues-tab-content.active {
+            display: block;
+        }
+        
+        .clues-tab-content::-webkit-scrollbar {
+            width: clamp(4px, 0.8vw, 8px);
+        }
+        
+        .clues-tab-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: clamp(2px, 0.4vw, 4px);
+        }
+        
+        .clues-tab-content::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: clamp(2px, 0.4vw, 4px);
+        }
+        
+        .clues-tab-content::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        
+        /* 기존 word-clues-container는 탭 시스템으로 대체됨 */
+        
+        /* 단어 아이템 반응형 스타일 */
+        .word-clue-item {
+            background: white;
+            padding: clamp(8px, 1.5vw, 12px);
+            border-radius: clamp(6px, 1vw, 8px);
+            border-left: clamp(3px, 0.6vw, 4px) solid #ddd;
+            margin-bottom: clamp(6px, 1vw, 8px);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: clamp(8px, 1.5vw, 12px);
+            box-sizing: border-box;
+        }
+        
+        .word-clue-number {
+            font-weight: bold;
+            min-width: clamp(18px, 3vw, 24px);
+            font-size: clamp(12px, 2.2vw, 14px);
+        }
+        
+        .word-clue-text {
+            font-size: clamp(11px, 2vw, 14px);
+            line-height: 1.4;
+            flex: 1;
+        }
+        
+        .word-clue-check {
+            font-size: clamp(12px, 2.2vw, 16px);
+        }
+        
+        /* 모바일 최적화 (768px 이하) */
+        @media (max-width: 768px) {
+            .solve-layout {
+                grid-template-columns: 1fr !important;
+                gap: clamp(12px, 2.5vw, 18px) !important;
+                padding: 0 clamp(8px, 2vw, 15px) !important;
+                margin: clamp(8px, 1.5vw, 12px) auto 0 !important;
+                max-width: calc(100vw - 16px) !important;
+            }
+            
+            .solve-grid-container {
+                order: 1;
+                margin-bottom: clamp(15px, 3vw, 20px);
+                max-width: calc(100vw - 32px) !important;
+                width: 100% !important;
+            }
+            
+            .word-clues-section {
+                order: 2;
+                max-height: 65vh !important;
+                max-width: calc(100vw - 32px) !important;
+                width: 100% !important;
+                padding: clamp(10px, 2vw, 16px) !important;
+            }
+            
+            .clues-tab-content {
+                max-height: calc(65vh - 140px) !important;
+            }
+            
+            :root {
+                --clues-max-height: 60vh !important;
+                --clues-scroll-height: 50vh !important;
+            }
+            
+            /* 모바일 버튼 스타일 개선 */
+            .solve-grid-container button {
+                font-size: clamp(12px, 3vw, 14px) !important;
+                padding: clamp(8px, 2vw, 12px) clamp(16px, 4vw, 20px) !important;
+                margin: clamp(3px, 0.8vw, 5px) !important;
+            }
+            
+            /* 모바일 범례 개선 */
+            .solve-grid-container .legend {
+                font-size: clamp(10px, 2.5vw, 12px) !important;
+                gap: clamp(10px, 2vw, 15px) !important;
+            }
+            
+            /* 모바일 탭 최적화 */
+            .clues-tabs {
+                flex-direction: row;
+                gap: clamp(3px, 0.6vw, 5px) !important;
+                padding: clamp(3px, 0.6vw, 5px) !important;
+            }
+            
+            .clues-tab {
+                padding: clamp(8px, 1.8vw, 12px) clamp(10px, 2vw, 14px) !important;
+                font-size: clamp(11px, 2.2vw, 13px) !important;
+                gap: clamp(3px, 0.6vw, 5px) !important;
+            }
+            
+            .clues-tab span:last-child {
+                font-size: clamp(10px, 2vw, 12px) !important;
+            }
+        }
+        
+        /* 작은 모바일 최적화 (480px 이하) */
+        @media (max-width: 480px) {
+            .solve-layout {
+                gap: clamp(10px, 2.2vw, 14px) !important;
+                margin: clamp(6px, 1.2vw, 10px) auto 0 !important;
+                padding: 0 clamp(6px, 1.5vw, 12px) !important;
+                max-width: calc(100vw - 12px) !important;
+            }
+            
+            .solve-grid-container {
+                max-width: calc(100vw - 24px) !important;
+                padding: clamp(8px, 2vw, 15px) !important;
+            }
+            
+            :root {
+                --clues-max-height: 55vh !important;
+                --clues-scroll-height: 45vh !important;
+            }
+            
+            .word-clues-section {
+                max-height: 55vh !important;
+                max-width: calc(100vw - 24px) !important;
+                width: 100% !important;
+                padding: clamp(8px, 1.8vw, 14px) !important;
+            }
+            
+            .clues-tab-content {
+                max-height: calc(55vh - 110px) !important;
+            }
+            
+            /* 작은 모바일 버튼 스타일 */
+            .solve-grid-container button {
+                font-size: clamp(11px, 2.8vw, 13px) !important;
+                padding: clamp(6px, 1.5vw, 10px) clamp(12px, 3vw, 16px) !important;
+            }
+            
+            /* 작은 모바일 범례 */
+            .solve-grid-container .legend {
+                font-size: clamp(9px, 2.2vw, 11px) !important;
+                gap: clamp(8px, 1.5vw, 12px) !important;
+            }
+            
+            /* 작은 모바일 탭 최적화 */
+            .clues-tabs {
+                gap: clamp(2px, 0.5vw, 4px) !important;
+                padding: clamp(2px, 0.5vw, 4px) !important;
+                margin-bottom: clamp(12px, 2.5vw, 16px) !important;
+            }
+            
+            .clues-tab {
+                padding: clamp(6px, 1.5vw, 10px) clamp(8px, 1.8vw, 12px) !important;
+                font-size: clamp(10px, 2vw, 12px) !important;
+                gap: clamp(2px, 0.5vw, 4px) !important;
+            }
+            
+            .clues-tab span:last-child {
+                font-size: clamp(9px, 1.8vw, 11px) !important;
+            }
+            
+            .clues-tab-icon {
+                font-size: clamp(11px, 2.2vw, 13px) !important;
+            }
+        }
+        
+        /* CSS 변수 정의 */
+        :root {
+            --cell-size: 30px;
+            --cell-font-size: 14px;
+            --cell-number-size: 8px;
+            --label-padding: 2px;
+            --label-min-width: 10px;
+            --label-border-radius: 2px;
+            --label-offset: 12px;
+            --clues-max-height: 70vh;
+            --clues-scroll-height: 60vh;
+        }
+        
+        /* 중형 화면 최적화 (1000px 이상) */
+        @media (min-width: 1000px) {
+            .solve-layout {
+                max-width: 980px;
+                gap: 20px;
+            }
+            
+            .solve-grid-container {
+                max-width: 540px;
+            }
+            
+            .word-clues-section {
+                max-width: 380px;
+            }
+        }
+        
+        /* 대형 화면 최적화 (1200px 이상) */
+        @media (min-width: 1200px) {
+            .solve-layout {
+                max-width: 1020px;
+                gap: 22px;
+                margin: 15px auto 0;
+                padding: 0 12px;
+            }
+            
+            .solve-grid-container {
+                max-width: 560px;
+                padding: 18px;
+            }
+            
+            .word-clues-section {
+                max-width: 400px;
+                padding: 18px;
+            }
+            
+            .clues-tab-content {
+                padding: 14px;
+                border-radius: 8px;
+                max-height: calc(75vh - 140px);
+            }
+        }
+        
+        /* 초대형 화면 제한 (1400px 이상) */
+        @media (min-width: 1400px) {
+            .solve-layout {
+                max-width: 1000px;
+            }
+            
+            .solve-grid-container {
+                max-width: 550px;
+            }
+            
+            .word-clues-section {
+                max-width: 390px;
+            }
+        }
+        
+        /* 동적 크기 조정을 위한 추가 스타일 */
+        .solve-grid-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: clamp(8px, 1.5vw, 12px);
+            justify-content: center;
+            align-items: center;
+            padding-top: clamp(12px, 2vw, 18px);
+            margin-top: auto;
+            border-top: 1px solid #e0e0e0;
+            flex-shrink: 0;
+        }
+        
+        .solve-grid-legend {
+            display: flex;
+            gap: clamp(10px, 2vw, 15px);
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(10px, 2vw, 12px);
+            margin-top: clamp(8px, 1.5vw, 12px);
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: clamp(4px, 0.8vw, 6px);
+        }
+        
+        .legend-color {
+            width: clamp(10px, 2vw, 12px);
+            height: clamp(10px, 2vw, 12px);
+            border-radius: clamp(1px, 0.2vw, 2px);
+            border: 1px solid rgba(0,0,0,0.2);
+        }
+        
+        /* 제작 모드 추가 모바일 최적화 */
+        @media (max-width: 768px) {
+            .grid {
+                max-width: calc(100vw - clamp(40px, 8vw, 60px));
+                margin: 0 auto;
+            }
+            
+            .word-list {
+                max-height: clamp(200px, 40vh, 300px);
+                overflow-y: auto;
+            }
+            
+            /* 퀴즈 제목 입력 */
+            .quiz-title {
+                font-size: clamp(12px, 3vw, 16px) !important;
+                padding: clamp(8px, 2vw, 12px) !important;
+            }
+            
+            /* 입력 그룹들 */
+            .input-group {
+                margin-bottom: clamp(8px, 2vw, 12px);
+            }
+            
+            .input-group input {
+                font-size: clamp(12px, 2.8vw, 14px);
+                padding: clamp(6px, 1.5vw, 10px);
+            }
+            
+            .input-group select {
+                font-size: clamp(12px, 2.8vw, 14px);
+                padding: clamp(6px, 1.5vw, 10px);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .grid {
+                max-width: calc(100vw - clamp(30px, 6vw, 40px));
+            }
+            
+            .word-list {
+                max-height: clamp(180px, 35vh, 250px);
+            }
+            
+            /* 퀴즈 제목 입력 */
+            .quiz-title {
+                font-size: clamp(11px, 2.5vw, 14px) !important;
+                padding: clamp(6px, 1.5vw, 10px) !important;
+            }
+            
+            /* 입력 필드들 */
+            .input-group input {
+                font-size: 12px !important;
+                padding: 6px !important;
+            }
+            
+            .input-group select {
+                font-size: 12px !important;
+                padding: 6px !important;
+            }
+            
+            /* 버튼들 */
+            button {
+                font-size: 12px !important;
+                padding: 6px 10px !important;
+            }
+            
+            /* 헤더 */
+            .header h1 {
+                font-size: 18px !important;
+            }
+            
+                         .mode-badge {
+                 font-size: 12px !important;
+                 padding: 8px 12px !important;
+             }
+        }
+        
+        /* 퀴즈 코드 입력 화면 모바일 최적화 */
+        @media (max-width: 768px) {
+            /* 코드 입력 박스 */
+            div[style*="max-width: 500px"] {
+                max-width: calc(100vw - 40px) !important;
+                margin: 20px auto !important;
+                padding: 20px !important;
+            }
+            
+            /* 코드 입력 필드 */
+            #codeInput {
+                font-size: 16px !important;
+                padding: 12px !important;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            /* 코드 입력 박스 */
+            div[style*="max-width: 500px"] {
+                max-width: calc(100vw - 20px) !important;
+                margin: 10px auto !important;
+                padding: 15px !important;
+            }
+            
+            /* 코드 입력 필드 */
+            #codeInput {
+                font-size: 14px !important;
+                padding: 10px !important;
+            }
+            
+            /* 아이콘 크기 조절 */
+            div[style*="font-size: 4rem"] {
+                font-size: 3rem !important;
+            }
+        }
+
+        /* 레거시 CSS 제거됨 - 새로운 완전 반응형 시스템으로 대체 */
+        
+        .cell.empty {
+            background: #e0e0e0;
+            border-color: #999;
+        }
+        
+        .cell:hover:not(.empty) {
+            background: #f0f4ff;
+            transform: scale(1.05);
+        }
+        
+        .cell.selected {
+            background: #667eea !important;
+            color: white;
+        }
+        
+        /* 풀이 모드 그리드 셀 스타일링 */
+        .solve-grid-cell {
+            position: relative;
+            border-radius: 6px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .solve-grid-cell input {
+            width: 100%;
+            height: 100%;
+            border: none;
+            outline: none;
+            background: transparent;
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+            caret-color: transparent; /* 기본 커서 숨김 */
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* 포커스된 셀의 세련된 효과 */
+        .solve-grid-cell.focused {
+            background: linear-gradient(135deg, #f0f7ff 0%, #e3f2fd 100%) !important;
+            border: 2px solid #2196F3 !important;
+            box-shadow: 
+                0 0 0 3px rgba(33, 150, 243, 0.1),
+                0 4px 20px rgba(33, 150, 243, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            transform: scale(1.02);
+            z-index: 10;
+        }
+        
+        /* 글로우 애니메이션 */
+        .solve-grid-cell.focused::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, rgba(33, 150, 243, 0.2), rgba(100, 181, 246, 0.3), rgba(33, 150, 243, 0.2));
+            border-radius: 8px;
+            z-index: -1;
+            opacity: 0.3;
+            animation: pulseGlow 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulseGlow {
+            0%, 100% {
+                opacity: 0.2;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.4;
+                transform: scale(1.01);
+            }
+        }
+        
+        /* 완성된 단어의 셀 스타일 */
+        .solve-grid-cell.correct {
+            background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%) !important;
+            border-color: #4CAF50 !important;
+            color: #2e7d32;
+        }
+        
+        /* 틀린 답의 셀 스타일 */
+        .solve-grid-cell.incorrect {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%) !important;
+            border-color: #f39c12 !important;
+            color: #d68910;
+        }
+        
+        .word-list {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        
+        .word-item {
+            background: linear-gradient(135deg, #fff 0%, #f8faff 100%);
+            padding: clamp(12px, 3vw, 18px);
+            margin: clamp(8px, 2vw, 12px) 0;
+            border-radius: 16px;
+            border: 1px solid rgba(76, 175, 80, 0.2);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .word-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            border-radius: 0 2px 2px 0;
+        }
+        
+        .word-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        }
+        
+        .word-item.unplaced {
+            border-color: rgba(244, 67, 54, 0.2);
+            background: linear-gradient(135deg, #fff5f5 0%, #fff 100%);
+        }
+        
+        .word-item.unplaced::before {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+        }
+        
+        .word-item.selected {
+            background: linear-gradient(135deg, #e3f2fd 0%, #f8faff 100%);
+            border-color: rgba(33, 150, 243, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(33, 150, 243, 0.15);
+        }
+        
+        .word-item.selected::before {
+            background: linear-gradient(135deg, #2196F3, #1976d2);
+        }
+        
+        .word-text {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .word-hint {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        
+        .word-meta {
+            font-size: 12px;
+            color: #999;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+
+        
+        .manual-mode-info {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            color: #856404;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 13px;
+            text-align: center;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: clamp(10px, 2vw, 15px);
+            margin: clamp(15px, 3vw, 20px) 0;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #fff 0%, #f8faff 100%);
+            padding: clamp(12px, 3vw, 18px);
+            border-radius: 16px;
+            text-align: center;
+            border: 1px solid rgba(102, 126, 234, 0.15);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        }
+        
+        .stat-number {
+            font-size: clamp(20px, 4vw, 28px);
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 4px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .stat-label {
+            font-size: clamp(10px, 2vw, 12px);
+            color: #6c757d;
+            margin-top: 4px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+        
+        @media (max-width: 768px) {
+            .stats {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                gap: 10px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+            
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .cell {
+                width: 30px;
+                height: 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧩 가로세로 낱말퀴즈 놀이터</h1>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button id="createModeBtn" class="mode-badge" style="cursor: pointer; border: none; font-size: 1rem;">
+                    📝 제작 모드
+                </button>
+                <button id="solveModeBtn" class="mode-badge" style="cursor: pointer; border: none; background: linear-gradient(45deg, #2196F3, #1976D2); font-size: 1rem;">
+                    🎮 풀이 모드
+                </button>
+            </div>
+        </div>
+        
+
+        
+        <div style="margin-bottom: 20px;">
+            <label for="quizTitle" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333; font-size: 14px;">퀴즈명</label>
+            <input type="text" id="quizTitle" class="quiz-title" placeholder="퀴즈 제목을 입력하세요 (예: 우리반 가로세로 낱말퀴즈)" value="우리반 가로세로 낱말퀴즈">
+        </div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalWords">0</div>
+                <div class="stat-label">전체 단어</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="placedWords">0</div>
+                <div class="stat-label">배치된 단어</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="gridSize">10×10</div>
+                <div class="stat-label">그리드 크기</div>
+            </div>
+        </div>
+        
+        <div class="main-layout">
+            <div class="word-panel">
+                <h3 class="panel-title">📝 단어 관리</h3>
+                
+                <div class="form-group">
+                    <label class="form-label">단어</label>
+                    <input type="text" id="wordInput" class="form-input" placeholder="단어를 입력하세요">
+                </div>
+                
+                <div class="form-group">
+                                    <label class="form-label">설명</label>
+                <input type="text" id="hintInput" class="form-input" placeholder="설명을 입력하세요">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">방향</label>
+                    <select id="directionSelect" class="form-select">
+                        <option value="horizontal">➡️ 가로</option>
+                        <option value="vertical">⬇️ 세로</option>
+                    </select>
+                </div>
+                
+                <button class="btn btn-success" onclick="addWord()" style="width: 100%; margin: 0;">➕ 단어 추가</button>
+                
+                <div style="margin-top: 20px; display: flex; gap: 8px;">
+                    <div style="flex: 1; position: relative;">
+                        <input type="file" id="excel-upload-main" accept=".xlsx,.xls" onchange="handleExcelUpload(event)" 
+                               style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+                        <button class="btn" style="width: 100%; margin: 0; background: linear-gradient(135deg, #16a085, #138d75); color: white; padding: 8px 12px; font-size: 13px;" 
+                                onclick="document.getElementById('excel-upload-main').click()">
+                            📊 단어 일괄 업로드
+                        </button>
+                    </div>
+                    
+                    <div style="flex: 1;">
+                        <button class="btn" style="width: 100%; margin: 0; background: linear-gradient(135deg, #3498db, #2980b9); color: white; padding: 8px 12px; font-size: 13px;" 
+                                onclick="downloadExcelTemplate()">
+                            📥 양식 다운로드
+                        </button>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px; background: #e3f2fd; padding: 15px; border-radius: 10px; border: 2px solid #2196F3;">
+                    <h4 style="color: #1976D2; margin-bottom: 10px; font-size: 14px;">💡 단어 배치 방법</h4>
+                    <ul style="color: #1976D2; font-size: 12px; margin: 0; padding-left: 15px;">
+                        <li>단어를 선택한 후 그리드의 원하는 위치를 클릭</li>
+                        <li>자동 배치 후 그리드에서 드래그로 위치 변경</li>
+                        <li>방향 전환 버튼으로 가로/세로 전환</li>
+                    </ul>
+                </div>
+                
+                <div class="word-list" id="wordList">
+                    <!-- 단어 목록이 여기에 표시됩니다 -->
+                </div>
+            </div>
+            
+            <div class="grid-panel">
+                <h3 class="panel-title">🎯 퀴즈 그리드</h3>
+                
+                <div class="grid-size-controls">
+                    <span>그리드 크기:</span>
+                    <input type="number" id="gridRows" class="size-input" value="10" min="5" max="20" onchange="updateGridSize()">
+                    <span>×</span>
+                    <input type="number" id="gridCols" class="size-input" value="10" min="5" max="20" onchange="updateGridSize()">
+                </div>
+                
+                <div class="grid-controls">
+                    <button class="btn btn-success" onclick="autoPlaceWords()">🎲 자동 배치</button>
+                    <button class="btn btn-secondary" onclick="clearGrid()">🗑️ 그리드 초기화</button>
+                    <button class="btn btn-secondary" onclick="shareQuiz()">📤 공유하기</button>
+                    
+                </div>
+                
+                <div class="grid-container">
+                    <div class="grid" id="grid" data-grid-container="true">
+                        <!-- 그리드가 여기에 생성됩니다 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== 전역 변수 ==========
+        let words = [];
+        let grid = Array(10).fill(null).map(() => Array(10).fill(''));
+        let gridSize = { rows: 10, cols: 10 };
+        let mode = 'create';
+        let selectedWordForPlacement = null;
+        let playerGrid = Array(10).fill(null).map(() => Array(10).fill(''));
+        let completedWords = new Set();
+        let missionCompleted = false;
+        let wordNumbers = {};
+        let activeInputField = null;
+        let isComposing = false;
+        
+        // 🔒 공유받은 상태 추적 변수 (보안 개선)
+        let isSharedQuizMode = false;
+        let sharedQuizData = null;
+
+        // ========== 초기화 ==========
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 가로세로 낱말퀴즈 놀이터 시작!');
+            initializeGrid();
+            addSampleWords();
+            updateStats();
+            
+            // 모드 버튼 이벤트 리스너 (초기 페이지용)
+            document.getElementById('createModeBtn').addEventListener('click', () => switchMode('create'));
+            document.getElementById('solveModeBtn').addEventListener('click', () => switchMode('codeInput'));
+        });
+        
+
+
+        // ========== 퀴즈 풀이 관련 함수 ==========
+        function generateWordNumbers(wordsData) {
+            const numbers = {};
+            let horizontalIndex = 1;
+            let verticalIndex = 1;
+            
+            const placedWords = wordsData.filter(w => w.placed);
+            const horizontalWords = placedWords.filter(w => w.direction === 'horizontal')
+                .sort((a, b) => a.startRow === b.startRow ? a.startCol - b.startCol : a.startRow - b.startRow);
+            const verticalWords = placedWords.filter(w => w.direction === 'vertical')
+                .sort((a, b) => a.startCol === b.startCol ? a.startRow - b.startRow : a.startCol - b.startCol);
+            
+            horizontalWords.forEach(word => {
+                numbers[word.id] = { direction: 'horizontal', number: horizontalIndex++ };
+            });
+            
+            verticalWords.forEach(word => {
+                numbers[word.id] = { direction: 'vertical', number: verticalIndex++ };
+            });
+            
+            return numbers;
+        }
+
+        function checkWordCompletion(wordData) {
+            const { word, startRow, startCol, direction } = wordData;
+            for (let i = 0; i < word.length; i++) {
+                const row = direction === 'horizontal' ? startRow : startRow + i;
+                const col = direction === 'horizontal' ? startCol + i : startCol;
+                if (playerGrid[row][col] !== word[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function checkMissionComplete() {
+            const placedWords = words.filter(w => w.placed);
+            const completedCount = placedWords.filter(w => checkWordCompletion(w)).length;
+            
+            if (completedCount === placedWords.length && placedWords.length > 0) {
+                if (!missionCompleted) {
+                    missionCompleted = true;
+                    setTimeout(() => {
+                        alert('🎉 미션 성공!\n\n모든 퀴즈 완료! 👏');
+                    }, 300);
+                }
+            } else {
+                missionCompleted = false;
+            }
+        }
+
+        function getCellWordInfo(row, col) {
+            for (const word of words.filter(w => w.placed)) {
+                for (let i = 0; i < word.word.length; i++) {
+                    const wordRow = word.direction === 'horizontal' ? word.startRow : word.startRow + i;
+                    const wordCol = word.direction === 'horizontal' ? word.startCol + i : word.startCol;
+                    if (wordRow === row && wordCol === col) {
+                        const isCompleted = checkWordCompletion(word);
+                        const isCorrect = playerGrid[row][col] === word.word[i];
+                        return { word, isCompleted, isCorrect, hasContent: playerGrid[row][col] !== '' };
+                    }
+                }
+            }
+            return null;
+        }
+
+        // 현재 활성화된 입력 필드 추적 (이미 전역 변수로 선언됨)
+
+        // 한글과 영어를 모두 처리하는 함수
+        function processInputValue(value) {
+            if (!value) return '';
+            const firstChar = value.charAt(0);
+            // 한글 완성 문자 범위 확인 (가-힣)
+            if (firstChar >= '가' && firstChar <= '힣') {
+                return firstChar; // 완성된 한글은 그대로
+            }
+            // 영어는 대문자로
+            if (/[a-zA-Z]/.test(firstChar)) {
+                return firstChar.toUpperCase();
+            }
+            // 숫자나 기타 문자
+            return firstChar;
+        }
+
+        // 전역 클릭 이벤트로 포커스 관리
+        document.addEventListener('click', function(event) {
+            // 그리드 영역 외부 클릭 시 활성 입력 필드 해제
+            const gridContainer = event.target.closest('[data-grid-container]');
+            const isInputField = event.target.tagName === 'INPUT';
+            
+            if (!gridContainer && !isInputField && activeInputField) {
+                const activeElement = document.querySelector(`[data-cell="${activeInputField}"] input`);
+                if (activeElement) {
+                    activeElement.blur();
+                }
+                activeInputField = null;
+            }
+        });
+
+        function handleInputChange(row, col, value) {
+            if (mode === 'solve') {
+                playerGrid[row][col] = processInputValue(value);
+                
+                setTimeout(() => {
+                    const updatedCompleted = new Set();
+                    words.filter(w => w.placed).forEach(word => {
+                        if (checkWordCompletion(word)) {
+                            updatedCompleted.add(word.id);
+                        }
+                    });
+                    completedWords = updatedCompleted;
+                    checkMissionComplete();
+                    updateSolveGridDisplay();
+                }, 100);
+            }
+        }
+        
+        // ========== 모드 전환 ==========
+        function switchMode(newMode) {
+            mode = newMode;
+            updateModeButtons();
+            
+            if (mode === 'create') {
+                showCreateMode();
+            } else if (mode === 'codeInput') {
+                showCodeInputMode();
+            } else if (mode === 'solve') {
+                showSolveMode();
+            }
+        }
+        
+        // 퀴즈 코드 입력 화면에서 제작 모드 버튼 클릭 처리
+        function handleCreateModeClick() {
+            console.log('코드 입력 모드에서 제작 모드로 전환 - 새로운 퀴즈 시작');
+            
+            // 모든 데이터 완전 초기화
+            words = [];
+            grid = Array(10).fill(null).map(() => Array(10).fill(''));
+            gridSize = { rows: 10, cols: 10 };
+            selectedWordForPlacement = null;
+            
+            // 공유받은 상태 해제
+            isSharedQuizMode = false;
+            sharedQuizData = null;
+            
+            // URL 파라미터 제거
+            window.history.replaceState({}, document.title, window.location.pathname);
+            
+            switchMode('create');
+        }
+
+        // 풀이 모드에서 제작 모드로 전환 시 확인 대화상자
+        function confirmSwitchToCreate() {
+            let confirmMessage;
+            
+            // 공유받은 퀴즈인지 확인하여 다른 메시지 표시
+            if (isSharedQuizMode) {
+                confirmMessage = '새로운 퀴즈를 제작하시겠습니까?\n✨ 나만의 퀴즈를 만들어보세요!';
+            } else {
+                confirmMessage = '제작 모드로 돌아가시겠습니까?\n\n ⚠️ 주의: 현재 풀이하던 내용이 모두 초기화됩니다.\n진행 상황이 사라져도 괜찮으시면 "확인"을 눌러주세요.';
+            }
+            
+            const confirmSwitch = confirm(confirmMessage);
+            
+            if (confirmSwitch) {
+                console.log('제작 모드로 전환 시작'); // 디버그 로그
+                
+                // 공유받은 퀴즈인 경우 완전 초기화
+                if (isSharedQuizMode) {
+                    console.log('🔒 공유받은 퀴즈에서 제작모드로 전환 - 완전 초기화');
+                    
+                    // 모든 데이터 완전 초기화
+                    words = [];
+                    grid = Array(10).fill(null).map(() => Array(10).fill(''));
+                    gridSize = { rows: 10, cols: 10 };
+                    selectedWordForPlacement = null;
+                    
+                    // 공유받은 상태 해제
+                    isSharedQuizMode = false;
+                    sharedQuizData = null;
+                    
+                    // URL 파라미터 제거
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                } else {
+                    console.log('기존 퀴즈에서 제작모드로 전환 - 풀이 진행상황만 초기화');
+                }
+                
+                // 풀이 진행상황 초기화
+                playerGrid = Array(gridSize.rows).fill(null).map(() => Array(gridSize.cols).fill(''));
+                completedWords = new Set();
+                missionCompleted = false;
+                activeInputField = null;
+                
+                // 강제로 제작 모드로 전환
+                mode = 'create';
+                console.log('모드 변경됨:', mode); // 디버그 로그
+                
+                // DOM 강제 업데이트
+                setTimeout(() => {
+                    try {
+                        showCreateMode();
+                        console.log('제작 모드 화면 표시 완료'); // 디버그 로그
+                        
+                    } catch (error) {
+                        console.error('제작 모드 표시 중 오류:', error);
+                        // 오류 발생 시 페이지 새로고침
+                        window.location.reload();
+                    }
+                }, 100);
+            } else {
+                console.log('모드 전환 취소됨'); // 디버그 로그
+            }
+        }
+
+        
+
+        function showCreateMode() {
+            // �� 보안 체크: 공유받은 상태에서 제작모드로 이동 시 초기화
+            if (isSharedQuizMode) {
+                console.log('🔒 공유받은 퀴즈에서 제작모드 접근 - 데이터 초기화');
+                
+                // 기존 데이터 완전 초기화
+                words = [];
+                grid = Array(10).fill(null).map(() => Array(10).fill(''));
+                gridSize = { rows: 10, cols: 10 };
+                selectedWordForPlacement = null;
+                
+                // 제작모드 초기 상태로 복원
+                const titleInputElement = document.getElementById('quizTitle');
+                if (titleInputElement) {
+                    titleInputElement.value = '';
+                }
+                
+                // 공유받은 상태 해제
+                isSharedQuizMode = false;
+                sharedQuizData = null;
+                
+                // URL 파라미터 제거 (깔끔한 URL)
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+                alert('새로운 퀴즈로 시작됩니다! ✨');
+            }
+            
+            mode = 'create';
+            
+            // 제목 필드 초기화 (모든 경우에 적용)
+            const titleInput = document.getElementById('quizTitle');
+            if (titleInput) {
+                titleInput.value = '';
+            }
+            
+            // DOM 요소들이 존재하는지 확인 (퀴즈 코드 입력 화면에서 오는 경우 없을 수 있음)
+            const createModeElement = document.getElementById('createMode');
+            const solveModeElement = document.getElementById('solveMode');
+            const createBtnElement = document.getElementById('createBtn');
+            const solveBtnElement = document.getElementById('solveBtn');
+            
+            // 기본 제작 모드 요소들이 없으면 페이지를 새로고침하여 초기 상태로 돌아감
+            if (!createModeElement || !solveModeElement) {
+                console.log('제작 모드 요소가 없음 - 페이지 새로고침');
+                window.location.reload();
+                return;
+            }
+            
+            createModeElement.style.display = 'block';
+            solveModeElement.style.display = 'none';
+            
+            if (createBtnElement) createBtnElement.classList.add('active');
+            if (solveBtnElement) solveBtnElement.classList.remove('active');
+            
+            console.log('제작 모드로 전환');
+            
+            // 함수들을 안전하게 호출 (요소가 존재할 때만)
+            try {
+                updateGrid();
+                updateWordList();
+                updateStats();
+            } catch (error) {
+                console.error('제작 모드 초기화 중 오류:', error);
+            }
+        }
+
+        function showCodeInputMode() {
+            document.querySelector('.container').innerHTML = `
+                <div class="header">
+                    <h1>🧩 가로세로 낱말퀴즈 놀이터</h1>
+                    <div style="display: flex; gap: 15px; justify-content: center;">
+                        <button onclick="handleCreateModeClick()" class="mode-badge" style="cursor: pointer; border: none; font-size: 1rem; opacity: 0.7; background: linear-gradient(45deg, #4CAF50, #45a049);">
+                            📝 제작 모드
+                        </button>
+                        <button onclick="switchMode('codeInput')" class="mode-badge" style="cursor: pointer; border: none; background: linear-gradient(45deg, #2196F3, #1976D2); font-size: 1rem; opacity: 1;">
+                            🎮 풀이 모드
+                        </button>
+                    </div>
+                </div>
+                
+                <div style="max-width: 500px; margin: 40px auto; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <div style="font-size: 4rem; margin-bottom: 20px;">🔐</div>
+                        <h2 style="color: #333; margin-bottom: 10px;">퀴즈 코드 입력</h2>
+                        <p style="color: #666;">공유받은 퀴즈 코드를 입력해주세요</p>
+                    </div>
+                    
+                    <div style="margin-bottom: 30px;">
+                        <input type="text" id="codeInput" placeholder="퀴즈 코드를 입력하세요" 
+                               style="width: 100%; padding: 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 18px; text-align: center; font-family: monospace; text-transform: uppercase;">
+                    </div>
+                    
+                    <div style="display: flex; justify-content: center;">
+                        <button onclick="loadQuizFromCode()" style="padding: 15px 30px; background: linear-gradient(45deg, #4CAF50, #45a049); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer;">
+                            🚀 퀴즈 시작하기
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // 이벤트 리스너는 전역에서 이미 설정됨
+        }
+        
+        function updateModeButtons() {
+            const createBtn = document.getElementById('createModeBtn');
+            const solveBtn = document.getElementById('solveModeBtn');
+            
+            // 버튼이 존재하지 않으면 스킵 (퀴즈 코드 입력 화면 등)
+            if (!createBtn || !solveBtn) {
+                return;
+            }
+            
+            if (mode === 'create') {
+                createBtn.style.background = 'linear-gradient(45deg, #4CAF50, #45a049)';
+                solveBtn.style.background = 'linear-gradient(45deg, #2196F3, #1976D2)';
+                solveBtn.style.opacity = '0.7';
+                createBtn.style.opacity = '1';
+            } else {
+                createBtn.style.background = 'linear-gradient(45deg, #4CAF50, #45a049)';
+                createBtn.style.opacity = '0.7';
+                solveBtn.style.background = 'linear-gradient(45deg, #2196F3, #1976D2)';
+                solveBtn.style.opacity = '1';
+            }
+        }
+        
+        function addSampleWords() {
+            const samples = [
+                { word: '학교', hint: '학생들이 공부하는 곳' },
+                { word: '선생님', hint: '학생들을 가르치는 분' },
+                { word: '친구', hint: '함께 놀고 공부하는 사람' }
+            ];
+            
+            setTimeout(() => {
+                samples.forEach((sample, index) => {
+                    setTimeout(() => {
+                        const word = {
+                            id: Date.now() + index,
+                            word: sample.word.toUpperCase(),
+                            hint: sample.hint,
+                            direction: index % 2 === 0 ? 'horizontal' : 'vertical',
+                            placed: false,
+                            startRow: 0,
+                            startCol: 0
+                        };
+                        words.push(word);
+                        updateWordList();
+                        updateStats();
+                    }, index * 500);
+                });
+            }, 1000);
+        }
+        
+        // ========== 그리드 관리 ==========
+        function initializeGrid() {
+            grid = Array(gridSize.rows).fill(null).map(() => Array(gridSize.cols).fill(''));
+            createGridDOM();
+        }
+        
+        function createGridDOM() {
+            const gridElement = document.getElementById('grid');
+            gridElement.innerHTML = '';
+            gridElement.style.gridTemplateColumns = `repeat(${gridSize.cols}, 1fr)`;
+            
+            for (let row = 0; row < gridSize.rows; row++) {
+                for (let col = 0; col < gridSize.cols; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell empty';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    cell.onclick = () => handleCellClick(row, col);
+                    cell.ondragstart = (e) => handleDragStart(e, row, col);
+                    cell.ondrop = (e) => handleDrop(e, row, col);
+                    cell.ondragover = handleDragOver;
+                    cell.draggable = true;
+                    gridElement.appendChild(cell);
+                }
+            }
+            updateGridDisplay();
+        }
+        
+        function updateGridSize() {
+            const rows = Math.max(5, Math.min(20, parseInt(document.getElementById('gridRows').value)));
+            const cols = Math.max(5, Math.min(20, parseInt(document.getElementById('gridCols').value)));
+            
+            gridSize = { rows, cols };
+            
+            // 기존 단어들의 배치 상태 초기화
+            words.forEach(word => {
+                if (word.placed) {
+                    const maxRow = word.direction === 'horizontal' ? rows : rows - word.word.length;
+                    const maxCol = word.direction === 'horizontal' ? cols - word.word.length : cols;
+                    
+                    if (word.startRow >= maxRow || word.startCol >= maxCol) {
+                        word.placed = false;
+                    }
+                }
+            });
+            
+            initializeGrid();
+            updateWordList();
+            updateStats();
+            
+            // DOM 요소 존재 확인 후 업데이트
+            const gridSizeEl = document.getElementById('gridSize');
+            if (gridSizeEl) gridSizeEl.textContent = `${cols}×${rows}`;
+        }
+        
+        function updateGridDisplay() {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => {
+                const row = parseInt(cell.dataset.row);
+                const col = parseInt(cell.dataset.col);
+                const letter = grid[row][col];
+                
+                if (letter) {
+                    cell.className = 'cell';
+                    cell.textContent = letter;
+                    cell.draggable = true;
+                    cell.style.cursor = 'move';
+                } else {
+                    cell.className = 'cell empty';
+                    cell.textContent = '';
+                    cell.draggable = false;
+                    cell.style.cursor = 'pointer';
+                }
+            });
+        }
+        
+        // ========== 단어 관리 ==========
+        function addWord() {
+            const wordInput = document.getElementById('wordInput');
+            const hintInput = document.getElementById('hintInput');
+            const directionSelect = document.getElementById('directionSelect');
+            
+            const wordText = wordInput.value.trim().toUpperCase();
+            const hintText = hintInput.value.trim();
+            
+            if (!wordText || !hintText) {
+                alert('단어와 설명을 입력하세요!');
+                if (!wordText) {
+                    wordInput.focus();
+                } else {
+                    hintInput.focus();
+                }
+                return;
+            }
+            
+            if (wordText.length > Math.max(gridSize.rows, gridSize.cols)) {
+                alert(`단어가 너무 깁니다! (최대 ${Math.max(gridSize.rows, gridSize.cols)}글자)`);
+                return;
+            }
+            
+            const word = {
+                id: Date.now(),
+                word: wordText,
+                hint: hintText,
+                direction: directionSelect.value,
+                placed: false,
+                startRow: 0,
+                startCol: 0
+            };
+            
+            words.push(word);
+            updateWordList();
+            updateStats();
+            
+            // 백업 저장
+            try {
+                localStorage.setItem('crossword_words_backup_vanilla', JSON.stringify(words));
+                console.log(`단어 추가됨 및 백업 저장: ${word.word}`);
+            } catch (error) {
+                console.error('백업 저장 실패:', error);
+            }
+            
+            // 입력 필드 초기화
+            wordInput.value = '';
+            hintInput.value = '';
+            wordInput.focus();
+        }
+        
+        function deleteWord(id) {
+            if (confirm('이 단어를 삭제하시겠습니까?')) {
+                words = words.filter(word => word.id !== id);
+                regenerateGrid();
+                updateWordList();
+                updateStats();
+                
+                // 백업 저장
+                try {
+                    localStorage.setItem('crossword_words_backup_vanilla', JSON.stringify(words));
+                    console.log('단어 삭제됨 및 백업 업데이트');
+                } catch (error) {
+                    console.error('백업 저장 실패:', error);
+                }
+            }
+        }
+
+        // 엑셀 파일 업로드 처리
+        function handleExcelUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // 파일 확장자 검증
+            const fileName = file.name.toLowerCase();
+            if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
+                alert('엑셀 파일만 가능합니다.');
+                event.target.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // 첫 번째 시트 선택
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // JSON으로 변환
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    console.log('엑셀 데이터:', jsonData);
+                    
+                    // 데이터 검증 및 변환
+                    const newWordsFromExcel = [];
+                    let headerRowIndex = -1;
+                    
+                    // 헤더 행 찾기 ('단어', '설명' 열)
+                    for (let i = 0; i < Math.min(5, jsonData.length); i++) {
+                        const row = jsonData[i];
+                        if (row && row.length >= 2) {
+                            const col1 = String(row[0] || '').trim().toLowerCase();
+                            const col2 = String(row[1] || '').trim().toLowerCase();
+                            
+                            if ((col1.includes('단어') || col1.includes('word')) && 
+                                (col2.includes('설명') || col2.includes('hint') || col2.includes('clue'))) {
+                                headerRowIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // 헤더가 없으면 첫 번째 행을 헤더로 가정
+                    if (headerRowIndex === -1) {
+                        headerRowIndex = 0;
+                    }
+                    
+                    // 데이터 행 처리
+                    for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (row && row.length >= 2) {
+                            const word = String(row[0] || '').trim();
+                            const hint = String(row[1] || '').trim();
+                            
+                            if (word && hint) {
+                                newWordsFromExcel.push({
+                                    id: Date.now() + Math.random(),
+                                    word: word.toUpperCase(),
+                                    hint: hint,
+                                    direction: 'horizontal',
+                                    placed: false,
+                                    startRow: 0,
+                                    startCol: 0
+                                });
+                            }
+                        }
+                    }
+                    
+                    if (newWordsFromExcel.length === 0) {
+                        alert('단어 데이터를 찾을 수 없습니다.\n첫 번째 열: 단어, 두 번째 열: 설명');
+                        event.target.value = '';
+                        return;
+                    }
+                    
+                    // 기존 단어와 합치기
+                    words = [...words, ...newWordsFromExcel];
+                    updateWordList();
+                    updateStats();
+                    
+                    // 백업 저장
+                    try {
+                        localStorage.setItem('crossword_words_backup_vanilla', JSON.stringify(words));
+                    } catch (error) {
+                        console.error('백업 저장 실패:', error);
+                    }
+                    
+                    alert(`✅ ${newWordsFromExcel.length}개 단어 추가됨!`);
+                    
+                } catch (error) {
+                    console.error('엑셀 파일 처리 오류:', error);
+                    alert('파일 읽기 오류.\n파일 형식을 확인해주세요.');
+                }
+                
+                // 파일 입력 초기화
+                event.target.value = '';
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        // 엑셀 템플릿 다운로드
+        function downloadExcelTemplate() {
+            const data = [
+                ['단어', '설명'],
+                ['학교', '학생들이 공부하는 곳'],
+                ['선생님', '학생들을 가르치는 분'],
+                ['책', '글이 적혀있는 것'],
+                ['연필', '글씨를 쓰는 도구']
+            ];
+
+            const worksheet = XLSX.utils.aoa_to_sheet(data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, '단어목록');
+
+            // 셀 스타일 설정 (헤더 굵게)
+            if (worksheet['A1']) worksheet['A1'].s = { font: { bold: true } };
+            if (worksheet['B1']) worksheet['B1'].s = { font: { bold: true } };
+
+            XLSX.writeFile(workbook, '낱말퀴즈_템플릿.xlsx');
+        }
+        
+        function toggleWordDirection(id) {
+            const word = words.find(w => w.id === id);
+            if (word) {
+                word.direction = word.direction === 'horizontal' ? 'vertical' : 'horizontal';
+                
+                // 방향 변경 후 배치 가능 여부 확인
+                if (word.placed && !canPlaceWord(word, word.startRow, word.startCol)) {
+                    word.placed = false;
+                }
+                
+                regenerateGrid();
+                updateWordList();
+                updateStats();
+            }
+        }
+        
+        function selectWordForPlacement(id) {
+            const word = words.find(w => w.id === id);
+            if (word) {
+                selectedWordForPlacement = word;
+                updateWordList(); // 선택 상태 업데이트
+            }
+        }
+        
+        // ========== 배치 알고리즘 ==========
+        function canPlaceWord(word, startRow, startCol) {
+            for (let i = 0; i < word.word.length; i++) {
+                const row = word.direction === 'horizontal' ? startRow : startRow + i;
+                const col = word.direction === 'horizontal' ? startCol + i : startCol;
+                
+                // 그리드 범위 확인
+                if (row < 0 || row >= gridSize.rows || col < 0 || col >= gridSize.cols) {
+                    return false;
+                }
+                
+                // 충돌 확인 (같은 글자는 교차점으로 허용)
+                const currentCell = grid[row][col];
+                if (currentCell !== '' && currentCell !== word.word[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // 교차점 찾기 함수
+        function findIntersections(word1, word2) {
+            const intersections = [];
+            
+            for (let i = 0; i < word1.word.length; i++) {
+                for (let j = 0; j < word2.word.length; j++) {
+                    if (word1.word[i] === word2.word[j]) {
+                        intersections.push({
+                            word1Index: i,
+                            word2Index: j,
+                            letter: word1.word[i]
+                        });
+                    }
+                }
+            }
+            
+            return intersections;
+        }
+
+        // 교차점에서 단어 배치 시도
+        function tryPlaceWordAtIntersection(newWord, placedWord, intersection) {
+            const isNewHorizontal = newWord.direction === 'horizontal';
+            const isPlacedHorizontal = placedWord.direction === 'horizontal';
+            
+            // 서로 다른 방향인 경우에만 교차 가능
+            if (isNewHorizontal === isPlacedHorizontal) return null;
+            
+            let newStartRow, newStartCol;
+            
+            if (isNewHorizontal) {
+                // 새 단어가 가로, 기존 단어가 세로
+                newStartRow = placedWord.startRow + intersection.word2Index;
+                newStartCol = placedWord.startCol - intersection.word1Index;
+            } else {
+                // 새 단어가 세로, 기존 단어가 가로  
+                newStartRow = placedWord.startRow - intersection.word1Index;
+                newStartCol = placedWord.startCol + intersection.word2Index;
+            }
+            
+            // 범위 확인
+            if (newStartRow < 0 || newStartCol < 0) return null;
+            
+            const maxRow = isNewHorizontal ? newStartRow + 1 : newStartRow + newWord.word.length;
+            const maxCol = isNewHorizontal ? newStartCol + newWord.word.length : newStartCol + 1;
+            
+            if (maxRow > gridSize.rows || maxCol > gridSize.cols) return null;
+            
+            // 배치 가능 여부 확인
+            if (canPlaceWord(newWord, newStartRow, newStartCol)) {
+                return { startRow: newStartRow, startCol: newStartCol };
+            }
+            
+            return null;
+        }
+        
+        function placeWordOnGrid(word) {
+            for (let i = 0; i < word.word.length; i++) {
+                const row = word.direction === 'horizontal' ? word.startRow : word.startRow + i;
+                const col = word.direction === 'horizontal' ? word.startCol + i : word.startCol;
+                grid[row][col] = word.word[i];
+            }
+        }
+        
+        function regenerateGrid() {
+            grid = Array(gridSize.rows).fill(null).map(() => Array(gridSize.cols).fill(''));
+            
+            words.filter(word => word.placed).forEach(word => {
+                placeWordOnGrid(word);
+            });
+            
+            updateGridDisplay();
+        }
+        
+        function autoPlaceWords() {
+            // 모든 단어의 배치 상태 초기화
+            words.forEach(word => word.placed = false);
+            grid = Array(gridSize.rows).fill(null).map(() => Array(gridSize.cols).fill(''));
+            
+            if (words.length === 0) {
+                alert('단어를 먼저 추가하세요!');
+                return;
+            }
+            
+            // 첫 번째 단어를 중앙에 배치
+            const firstWord = words[0];
+            const centerRow = Math.floor(gridSize.rows / 2);
+            let centerCol;
+            
+            if (firstWord.direction === 'horizontal') {
+                centerCol = Math.max(0, Math.floor(gridSize.cols / 2) - Math.floor(firstWord.word.length / 2));
+            } else {
+                centerCol = Math.floor(gridSize.cols / 2);
+            }
+            
+            if (canPlaceWord(firstWord, centerRow, centerCol)) {
+                firstWord.startRow = centerRow;
+                firstWord.startCol = centerCol;
+                firstWord.placed = true;
+                placeWordOnGrid(firstWord);
+            }
+
+            // 나머지 단어들을 교차점 우선으로 배치
+            for (let i = 1; i < words.length; i++) {
+                const word = words[i];
+                let placed = false;
+                let bestPosition = null;
+                
+                // 1. 먼저 기존 배치된 단어들과의 교차점 찾기
+                const placedWords = words.filter(w => w.placed);
+                
+                for (const placedWord of placedWords) {
+                    const intersections = findIntersections(word, placedWord);
+                    
+                    for (const intersection of intersections) {
+                        const position = tryPlaceWordAtIntersection(word, placedWord, intersection);
+                        if (position) {
+                            bestPosition = position;
+                            placed = true;
+                            break;
+                        }
+                    }
+                    
+                    if (placed) break;
+                }
+                
+                // 2. 교차점 배치가 안 되면 빈 공간에 랜덤 배치 시도
+                if (!placed) {
+                    for (let attempt = 0; attempt < 100 && !placed; attempt++) {
+                        const maxRow = word.direction === 'horizontal' ? gridSize.rows : gridSize.rows - word.word.length + 1;
+                        const maxCol = word.direction === 'horizontal' ? gridSize.cols - word.word.length + 1 : gridSize.cols;
+                        
+                        if (maxRow <= 0 || maxCol <= 0) continue;
+                        
+                        const startRow = Math.floor(Math.random() * maxRow);
+                        const startCol = Math.floor(Math.random() * maxCol);
+                        
+                        if (canPlaceWord(word, startRow, startCol)) {
+                            bestPosition = { startRow, startCol };
+                            placed = true;
+                        }
+                    }
+                }
+                
+                // 단어 배치
+                if (placed && bestPosition) {
+                    word.startRow = bestPosition.startRow;
+                    word.startCol = bestPosition.startCol;
+                    word.placed = true;
+                    placeWordOnGrid(word);
+                }
+            }
+            
+            updateGridDisplay();
+            updateWordList();
+            updateStats();
+            
+            const placedCount = words.filter(w => w.placed).length;
+            const intersectionCount = countIntersections();
+            alert(`🎯 자동 배치 완료!\n${placedCount}/${words.length}개 배치됨`);
+        }
+        
+        // 교차점 개수 계산
+        function countIntersections() {
+            let count = 0;
+            const placedWords = words.filter(w => w.placed);
+            
+            for (let i = 0; i < placedWords.length; i++) {
+                for (let j = i + 1; j < placedWords.length; j++) {
+                    const intersections = findIntersections(placedWords[i], placedWords[j]);
+                    
+                    // 실제 교차하는지 확인
+                    for (const intersection of intersections) {
+                        const word1 = placedWords[i];
+                        const word2 = placedWords[j];
+                        
+                        if (word1.direction !== word2.direction) {
+                            const row1 = word1.direction === 'horizontal' ? word1.startRow : word1.startRow + intersection.word1Index;
+                            const col1 = word1.direction === 'horizontal' ? word1.startCol + intersection.word1Index : word1.startCol;
+                            
+                            const row2 = word2.direction === 'horizontal' ? word2.startRow : word2.startRow + intersection.word2Index;
+                            const col2 = word2.direction === 'horizontal' ? word2.startCol + intersection.word2Index : word2.startCol;
+                            
+                            if (row1 === row2 && col1 === col2) {
+                                count++;
+                                break; // 같은 단어 쌍에서는 하나의 교차점만 카운트
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return count;
+        }
+        
+        function clearGrid() {
+            if (confirm('그리드를 초기화하시겠습니까? 모든 단어 배치가 삭제됩니다.')) {
+                words.forEach(word => word.placed = false);
+                grid = Array(gridSize.rows).fill(null).map(() => Array(gridSize.cols).fill(''));
+                updateGridDisplay();
+                updateWordList();
+                updateStats();
+            }
+        }
+        
+        // ========== 드래그 앤 드롭 ==========
+        function handleDragStart(e, row, col) {
+            // 해당 위치의 단어 찾기
+            const wordAtPosition = words.find(word => {
+                if (!word.placed) return false;
+                const { startRow, startCol, direction, word: wordText } = word;
+                
+                for (let i = 0; i < wordText.length; i++) {
+                    const wordRow = direction === 'horizontal' ? startRow : startRow + i;
+                    const wordCol = direction === 'horizontal' ? startCol + i : startCol;
+                    if (wordRow === row && wordCol === col) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+            
+            if (wordAtPosition) {
+                draggedWord = wordAtPosition;
+                e.dataTransfer.effectAllowed = 'move';
+            }
+        }
+        
+        function handleDrop(e, row, col) {
+            e.preventDefault();
+            if (draggedWord) {
+                if (canPlaceWord(draggedWord, row, col)) {
+                    draggedWord.startRow = row;
+                    draggedWord.startCol = col;
+                    draggedWord.placed = true;
+                    regenerateGrid();
+                    updateWordList();
+                    updateStats();
+                }
+                draggedWord = null;
+            }
+        }
+        
+        function handleDragOver(e) {
+            e.preventDefault();
+        }
+        
+        function handleCellClick(row, col) {
+            if (selectedWordForPlacement) {
+                if (canPlaceWord(selectedWordForPlacement, row, col)) {
+                    // 기존 배치 제거
+                    if (selectedWordForPlacement.placed) {
+                        regenerateGrid();
+                    }
+                    
+                    selectedWordForPlacement.startRow = row;
+                    selectedWordForPlacement.startCol = col;
+                    selectedWordForPlacement.placed = true;
+                    
+                    regenerateGrid();
+                    updateWordList();
+                    updateStats();
+                    
+                    selectedWordForPlacement = null;
+                } else {
+                    alert('이 위치에 배치할 수 없습니다!');
+                }
+            }
+        }
+        
+        // ========== UI 업데이트 ==========
+        function updateWordList() {
+            console.log('updateWordList 호출됨, words 배열:', words.length, '개'); // 디버그 로그
+            const wordList = document.getElementById('wordList');
+            if (!wordList) {
+                console.log('wordList 요소를 찾을 수 없음'); // 디버그 로그
+                // 다시 시도
+                setTimeout(() => {
+                    console.log('wordList 요소 재시도');
+                    updateWordList();
+                }, 100);
+                return;
+            }
+            
+            console.log('단어 목록 상세:', words.map(w => `${w.word}(${w.placed ? '배치됨' : '미배치'})`)); // 디버그 로그
+            console.log('미배치된 단어 수:', words.filter(w => !w.placed).length); // 디버그 로그
+            
+            // 안전하게 innerHTML 초기화
+            try {
+                wordList.innerHTML = '';
+            } catch (error) {
+                console.error('wordList innerHTML 초기화 실패:', error);
+                return;
+            }
+            
+            if (words.length === 0) {
+                wordList.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">등록된 단어가 없습니다.</div>';
+                return;
+            }
+            
+            words.forEach(word => {
+                const wordItem = document.createElement('div');
+                wordItem.className = `word-item ${word.placed ? '' : 'unplaced'}`;
+                
+                if (selectedWordForPlacement && selectedWordForPlacement.id === word.id) {
+                    wordItem.className += ' selected';
+                }
+                
+                wordItem.style.position = 'relative';
+                wordItem.style.paddingRight = '30px';
+                
+                wordItem.innerHTML = `
+                    <button onclick="deleteWord(${word.id})" style="position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; background: #ff5252; color: white; border: none; border-radius: 50%; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center;">✕</button>
+                    
+                    <div class="word-text">${word.word}</div>
+                    <div class="word-hint">${word.hint}</div>
+                    <div class="word-meta">
+                        <span>${word.direction === 'horizontal' ? '➡️ 가로' : '⬇️ 세로'} ${word.placed ? '✅ 배치됨' : '❌ 미배치'}</span>
+                        <div style="margin-top: 8px;">
+                            <button class="btn btn-secondary" style="padding: 4px 12px; margin: 2px; font-size: 11px;" onclick="selectWordForPlacement(${word.id})">선택</button>
+                            <button class="btn btn-primary" style="padding: 4px 12px; margin: 2px; font-size: 11px;" onclick="toggleWordDirection(${word.id})">방향 전환</button>
+                        </div>
+                    </div>
+                `;
+                
+                wordList.appendChild(wordItem);
+                console.log(`단어 DOM 추가됨: ${word.word} (${word.placed ? '배치됨' : '미배치'})`);
+            });
+            
+            console.log('updateWordList 완료, DOM에 추가된 단어 수:', wordList.children.length);
+            
+            // 최종 검증
+            const unplacedCount = words.filter(w => !w.placed).length;
+            const unplacedInDOM = wordList.querySelectorAll('.word-item').length;
+            if (unplacedCount > 0 && unplacedInDOM === 0) {
+                console.error('⚠️ 미배치 단어가 DOM에 표시되지 않음! 강제 재시도');
+                setTimeout(() => updateWordList(), 200);
+            }
+        }
+        
+        function updateStats() {
+            // DOM 요소 존재 확인 후 업데이트 (풀이 모드에서는 이 요소들이 없음)
+            const totalWordsEl = document.getElementById('totalWords');
+            const placedWordsEl = document.getElementById('placedWords');
+            const gridSizeEl = document.getElementById('gridSize');
+            
+            if (totalWordsEl) totalWordsEl.textContent = words.length;
+            if (placedWordsEl) placedWordsEl.textContent = words.filter(w => w.placed).length;
+            if (gridSizeEl) gridSizeEl.textContent = `${gridSize.cols}×${gridSize.rows}`;
+        }
+        
+        // ========== 공유 및 기타 기능 ==========
+
+
+
+        function loadQuizFromCode() {
+            const codeInput = document.getElementById('codeInput');
+            const code = codeInput.value.trim().toUpperCase();
+            
+            if (!code) {
+                alert('퀴즈 코드를 입력하세요!');
+                return;
+            }
+            
+            // 로딩 표시
+            const loadingAlert = document.createElement('div');
+            loadingAlert.style.cssText = `
+                position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                z-index: 2000; text-align: center; min-width: 200px;
+            `;
+            loadingAlert.innerHTML = `
+                                        <div style="color: #2196F3; font-weight: bold; margin-bottom: 10px;">🔍 퀴즈 검색 중...</div>
+                <div style="color: #666; font-size: 14px;">퀴즈 코드: ${code}</div>
+            `;
+            document.body.appendChild(loadingAlert);
+            
+            // Supabase에서 퀴즈 로드
+            (async () => {
+                try {
+                    // Supabase에서 퀴즈 데이터 가져오기
+                    const loadedQuizData = await loadQuizFromSupabase(code);
+                    
+                    // 로딩창 제거
+                    if (loadingAlert.parentNode) {
+                        document.body.removeChild(loadingAlert);
+                    }
+                    
+                    // 🔒 공유받은 퀴즈 상태로 설정
+                    isSharedQuizMode = true;
+                    sharedQuizData = { ...loadedQuizData };
+                    
+                    quizData = loadedQuizData;
+                    words = loadedQuizData.words || [];
+                    grid = loadedQuizData.grid || [];
+                    gridSize = loadedQuizData.gridSize || { rows: 10, cols: 10 };
+                    
+                    // playerGrid 초기화
+                    playerGrid = Array(gridSize.rows).fill(null).map(() => Array(gridSize.cols).fill(''));
+                    
+                    // 단어 번호 생성
+                    wordNumbers = generateWordNumbers(words);
+                    completedWords = new Set();
+                    missionCompleted = false;
+                    
+                    switchMode('solve');
+                    
+                    setTimeout(() => {
+                        alert(`🎮 "${loadedQuizData.title}" 로드 완료!\n즐거운 퀴즈 시간 되세요! 🧩`);
+                    }, 300);
+                    
+                } catch (error) {
+                    // 로딩창 제거
+                    if (loadingAlert.parentNode) {
+                        document.body.removeChild(loadingAlert);
+                    }
+                    
+                    console.error('퀴즈 로딩 오류:', error);
+                    
+                    // 사용자 친화적인 오류 메시지
+                    let errorMessage = '❌ 퀴즈를 불러올 수 없습니다.\n\n';
+                    
+                    if (error.message && error.message.includes('Failed to fetch')) {
+                        errorMessage += '🌐 인터넷 연결을 확인하고 다시 시도해주세요.';
+                    } else if (error.message && error.message.includes('퀴즈 코드를 찾을 수 없습니다')) {
+                        errorMessage += '📝 퀴즈 코드를 다시 확인해주세요.';
+                    } else if (error.message && error.message.includes('퀴즈 데이터가 비어있습니다')) {
+                        errorMessage += '📄 퀴즈 데이터에 문제가 있습니다.\n퀴즈 제작자에게 문의해주세요.';
+                    } else if (error.message && error.message.includes('초기화')) {
+                        errorMessage += '🔧 페이지를 새로고침하고 다시 시도해주세요.';
+                    } else {
+                        errorMessage += '🔄 잠시 후 다시 시도해주세요.';
+                    }
+                    
+                    alert(errorMessage);
+                }
+            })();
+        }
+
+
+        
+        function showSolveMode() {
+            const quizTitle = sharedQuizData?.title || '가로세로 낱말퀴즈';
+            const horizontalWords = words.filter(w => w.direction === 'horizontal' && w.placed);
+            const verticalWords = words.filter(w => w.direction === 'vertical' && w.placed);
+            
+            document.querySelector('.container').innerHTML = `
+                <div class="header">
+                    <h1>🧩 가로세로 낱말퀴즈 놀이터</h1>
+                    <div style="display: flex; gap: 15px; justify-content: center;">
+                        <button onclick="confirmSwitchToCreate()" class="mode-badge" style="cursor: pointer; border: none; font-size: 1rem; opacity: 0.7; background: linear-gradient(45deg, #4CAF50, #45a049);">
+                            📝 제작 모드
+                        </button>
+                        <button class="mode-badge" style="cursor: pointer; border: none; background: linear-gradient(45deg, #2196F3, #1976D2); font-size: 1rem; opacity: 1;">
+                            🎮 풀이 모드
+                        </button>
+                    </div>
+                </div>
+                
+                ${missionCompleted ? `
+                    <div style="background: linear-gradient(45deg, #4CAF50, #45a049); color: white; padding: 20px; border-radius: 15px; margin: 20px 0; text-align: center; animation: slideDown 0.5s ease;">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">🎉</div>
+                        <h2 style="margin: 0 0 10px 0;">미션 성공!</h2>
+                        <p style="margin: 0;">모든 퀴즈를 해결했습니다! 정말 멋져요!</p>
+                    </div>
+                ` : ''}
+                
+                ${quizTitle ? `
+                    <div style="text-align: center; margin: 20px 0;">
+                        <span style="background: #e3f2fd; color: #1976d2; padding: 8px 20px; border-radius: 25px; font-size: 14px; font-weight: 500;">
+                            📝 ${quizTitle}
+                        </span>
+                    </div>
+                ` : ''}
+                
+                <div class="solve-layout">
+                    <div class="solve-grid-container" id="gridContainer">
+                        <h3 style="margin-bottom: clamp(18px, 2.8vw, 22px); color: #333; font-size: clamp(16px, 3.2vw, 19px); text-align: center; font-weight: 700;">🎯 퀴즈 그리드</h3>
+                        <div class="solve-grid" id="solveGrid" style="grid-template-columns: repeat(${gridSize.cols}, 1fr);">
+                            <!-- 그리드가 여기에 생성됩니다 -->
+                        </div>
+                        <div class="solve-grid-actions">
+                            <button onclick="resetPlayerGrid()" style="padding: clamp(8px, 2vw, 12px) clamp(16px, 3vw, 20px); background: #f44336; color: white; border: none; border-radius: clamp(6px, 1vw, 8px); cursor: pointer; font-weight: bold; font-size: clamp(12px, 2.5vw, 14px);">🔄 다시 시작</button>
+                        </div>
+                        <div class="solve-grid-legend">
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: #c8e6c9; border-color: #4caf50;"></div>
+                                <span>정답</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: #ffcdd2; border-color: #f44336;"></div>
+                                <span>오답</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="word-clues-section">
+                        <h3 style="margin-bottom: clamp(18px, 2.8vw, 22px); color: #333; font-size: clamp(16px, 3.2vw, 19px); text-align: center; font-weight: 700;">📝 단어 설명</h3>
+                        
+                        <!-- 탭 네비게이션 -->
+                        <div class="clues-tabs">
+                            <button class="clues-tab active" onclick="switchCluesTab('horizontal')" id="horizontalTab">
+                                <span class="clues-tab-icon">➡️</span>
+                                <span>가로 단어 (${horizontalWords.length}개)</span>
+                            </button>
+                            <button class="clues-tab" onclick="switchCluesTab('vertical')" id="verticalTab">
+                                <span class="clues-tab-icon">⬇️</span>
+                                <span>세로 단어 (${verticalWords.length}개)</span>
+                            </button>
+                        </div>
+                        
+                        <!-- 가로 단어 탭 콘텐츠 -->
+                        <div class="clues-tab-content active" id="horizontalContent">
+                            <div id="horizontalClues">
+                                ${horizontalWords
+                                    .map(word => ({ ...word, number: wordNumbers[word.id]?.number || 999 }))
+                                    .sort((a, b) => a.number - b.number)
+                                    .map((word) => {
+                                    const isCompleted = completedWords.has(word.id);
+                                    const wordNum = word.number === 999 ? '?' : word.number;
+                                    return `
+                                        <div class="word-clue-item" style="background: ${isCompleted ? '#c8e6c9' : 'white'}; border-left-color: ${isCompleted ? '#4caf50' : '#ddd'};">
+                                            <span class="word-clue-number" style="color: #2196F3;">${wordNum}.</span>
+                                            <span class="word-clue-text" style="${isCompleted ? 'text-decoration: line-through; color: #4caf50;' : ''}">${word.hint || '설명 없음'}</span>
+                                            ${isCompleted ? '<span class="word-clue-check" style="color: #4caf50;">✓</span>' : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                        
+                        <!-- 세로 단어 탭 콘텐츠 -->
+                        <div class="clues-tab-content" id="verticalContent">
+                            <div id="verticalClues">
+                                ${verticalWords
+                                    .map(word => ({ ...word, number: wordNumbers[word.id]?.number || 999 }))
+                                    .sort((a, b) => a.number - b.number)
+                                    .map((word) => {
+                                    const isCompleted = completedWords.has(word.id);
+                                    const wordNum = word.number === 999 ? '?' : word.number;
+                                    return `
+                                        <div class="word-clue-item" style="background: ${isCompleted ? '#c8e6c9' : 'white'}; border-left-color: ${isCompleted ? '#4caf50' : '#ddd'};">
+                                            <span class="word-clue-number" style="color: #f44336;">${wordNum}.</span>
+                                            <span class="word-clue-text" style="${isCompleted ? 'text-decoration: line-through; color: #4caf50;' : ''}">${word.hint || '설명 없음'}</span>
+                                            ${isCompleted ? '<span class="word-clue-check" style="color: #4caf50;">✓</span>' : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                        
+                        <div style="background: #e3f2fd; padding: clamp(12px, 2vw, 15px); border-radius: clamp(8px, 1.5vw, 10px); margin-top: auto; margin-bottom: 0; border: 1px solid #bbdefb; box-shadow: 0 2px 8px rgba(25, 118, 210, 0.1); flex-shrink: 0;">
+                            <p style="color: #1976d2; font-size: clamp(12px, 2.2vw, 14px); font-weight: bold; text-align: center; margin: 0; line-height: 1.3;">
+                                진행 상황: ${completedWords.size}/${words.filter(w => w.placed).length} 단어 완성
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            createSolveGrid();
+            
+            // 완전 반응형 그리드 크기 조절 (즉시 실행 + 지연 실행)
+            adjustGridContainerSize(); // 즉시 실행
+            setTimeout(() => {
+                adjustGridContainerSize(); // 렌더링 완료 후 재조정
+            }, 100);
+        }
+        
+        // 완전 반응형 그리드 크기 조정 함수
+        function adjustGridContainerSize() {
+            const gridElement = document.getElementById('solveGrid');
+            const containerElement = document.getElementById('gridContainer');
+            
+            if (!gridElement || !containerElement) return;
+            
+            // 그리드 크기 정보
+            const cols = gridSize.cols;
+            const rows = gridSize.rows;
+            const totalCells = cols * rows;
+            
+            // 화면 크기 정보
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            const isMobile = viewportWidth <= 768;
+            const isSmallMobile = viewportWidth <= 480;
+            
+            // 동적 셀 크기 계산
+            let availableWidth;
+            if (isMobile) {
+                // 모바일: 안전한 여백을 고려한 최대 사용 가능 폭
+                if (isSmallMobile) {
+                    availableWidth = viewportWidth * 0.85; // 작은 모바일: 85%
+                } else {
+                    availableWidth = viewportWidth * 0.88; // 일반 모바일: 88%
+                }
+            } else {
+                // 데스크톱: 확장된 크기로 큰 그리드 대응
+                availableWidth = Math.min(580, viewportWidth * 0.48); // 최대 580px 또는 화면의 48%
+            }
+            
+            // 패딩과 여백을 고려한 실제 그리드 사용 가능 폭
+            const padding = isSmallMobile ? 50 : (isMobile ? 70 : 80);
+            const netGridWidth = Math.max(200, availableWidth - padding); // 최소 200px 보장
+            
+            // 셀 크기 계산 (최소/최대 제한 적용)
+            const minCellSize = isSmallMobile ? 16 : (isMobile ? 20 : 25);
+            const maxCellSize = isSmallMobile ? 28 : (isMobile ? 35 : 45);
+            
+            // 최적 셀 크기 = 사용 가능 폭 / 더 큰 차원(행 또는 열)
+            const maxDimension = Math.max(cols, rows);
+            const gapSize = isSmallMobile ? 1 : (isMobile ? 2 : 3);
+            const totalGaps = (maxDimension - 1) * gapSize;
+            const targetCellSize = (netGridWidth - totalGaps) / maxDimension;
+            
+            // 최종 셀 크기 (제한 범위 내에서)
+            const cellSize = Math.max(minCellSize, Math.min(maxCellSize, targetCellSize));
+            
+            // 폰트 크기 비례 계산
+            const baseFontRatio = isSmallMobile ? 0.4 : (isMobile ? 0.45 : 0.5);
+            const cellFontSize = Math.max(8, cellSize * baseFontRatio);
+            
+            // 그리드 크기에 따른 숫자 폰트 크기 동적 조정
+            let numberRatio;
+            if (totalCells > 400) {
+                numberRatio = 0.12; // 매우 큰 그리드: 12%
+            } else if (totalCells > 200) {
+                numberRatio = 0.15; // 큰 그리드: 15%
+            } else if (totalCells > 100) {
+                numberRatio = 0.18; // 중간 그리드: 18%
+            } else {
+                numberRatio = 0.22; // 작은 그리드: 22%
+            }
+            
+            // 모바일에서는 더 작게 조정
+            if (isSmallMobile) {
+                numberRatio *= 0.8;
+            } else if (isMobile) {
+                numberRatio *= 0.9;
+            }
+            
+            const numberFontSize = Math.max(4, cellSize * numberRatio);
+            
+            // 숫자 라벨 패딩과 크기 계산 (그리드 크기에 반비례)
+            const labelPadding = Math.max(1, Math.min(3, cellSize * 0.08));
+            const labelMinWidth = Math.max(6, Math.min(12, cellSize * 0.3));
+            const labelBorderRadius = Math.max(1, Math.min(3, cellSize * 0.1));
+            const labelOffset = Math.max(8, Math.min(14, labelMinWidth + labelPadding + 2));
+            
+            // CSS 변수 업데이트
+            const root = document.documentElement;
+            root.style.setProperty('--cell-size', `${cellSize}px`);
+            root.style.setProperty('--cell-font-size', `${cellFontSize}px`);
+            root.style.setProperty('--cell-number-size', `${numberFontSize}px`);
+            root.style.setProperty('--label-padding', `${labelPadding}px`);
+            root.style.setProperty('--label-min-width', `${labelMinWidth}px`);
+            root.style.setProperty('--label-border-radius', `${labelBorderRadius}px`);
+            root.style.setProperty('--label-offset', `${labelOffset}px`);
+            
+            // 단어 설명 영역 높이 동적 조정
+            const cluesMaxHeight = Math.min(
+                viewportHeight * (isMobile ? 0.6 : 0.7),
+                isMobile ? 450 : 600
+            );
+            const cluesScrollHeight = cluesMaxHeight - (isMobile ? 100 : 120);
+            
+            root.style.setProperty('--clues-max-height', `${cluesMaxHeight}px`);
+            root.style.setProperty('--clues-scroll-height', `${cluesScrollHeight}px`);
+            
+            // 그리드 gap 조정
+            gridElement.style.gap = `${gapSize}px`;
+            
+            console.log(`🎯 반응형 그리드 조정: ${cols}×${rows} (${totalCells}칸), 셀:${cellSize}px, 폰트:${cellFontSize}px, 숫자:${numberFontSize}px, 화면:${viewportWidth}×${viewportHeight}`);
+        }
+        
+        // 창 크기 변경 시 그리드 크기 재조절 (완전 반응형)
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            if (mode === 'solve') {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    adjustGridContainerSize();
+                }, 200); // 더 빠른 반응
+            }
+        });
+        
+        // 화면 방향 변경 감지 (모바일 대응)
+        window.addEventListener('orientationchange', () => {
+            if (mode === 'solve') {
+                setTimeout(() => {
+                    adjustGridContainerSize();
+                }, 500); // 방향 전환 완료 후 실행
+            }
+        });
+        
+        // 단어 설명 탭 전환 함수
+        function switchCluesTab(tabType) {
+            // 모든 탭 비활성화
+            document.querySelectorAll('.clues-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // 모든 탭 콘텐츠 숨기기
+            document.querySelectorAll('.clues-tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // 선택된 탭 활성화
+            if (tabType === 'horizontal') {
+                document.getElementById('horizontalTab').classList.add('active');
+                document.getElementById('horizontalContent').classList.add('active');
+            } else if (tabType === 'vertical') {
+                document.getElementById('verticalTab').classList.add('active');
+                document.getElementById('verticalContent').classList.add('active');
+            }
+            
+            console.log(`📝 단어 설명 탭 전환: ${tabType === 'horizontal' ? '가로' : '세로'} 단어`);
+        }
+
+        function createSolveGrid() {
+            const gridElement = document.getElementById('solveGrid');
+            gridElement.innerHTML = '';
+            
+            for (let row = 0; row < gridSize.rows; row++) {
+                for (let col = 0; col < gridSize.cols; col++) {
+                    const cell = document.createElement('div');
+                    const letter = grid[row][col];
+                    
+                    if (letter === '') {
+                        cell.style.cssText = `
+                            width: var(--cell-size); height: var(--cell-size); 
+                            background: #e0e0e0; border: clamp(1px, 0.1vw, 2px) solid #bbb;
+                            border-radius: clamp(2px, 0.3vw, 4px); box-sizing: border-box;
+                        `;
+                    } else {
+                        // 해당 위치의 단어 정보 가져오기
+                        const wordsAtCell = words.filter(word => {
+                            if (!word.placed) return false;
+                            for (let i = 0; i < word.word.length; i++) {
+                                const wordRow = word.direction === 'horizontal' ? word.startRow : word.startRow + i;
+                                const wordCol = word.direction === 'horizontal' ? word.startCol + i : word.startCol;
+                                if (wordRow === row && wordCol === col) return true;
+                            }
+                            return false;
+                        });
+                        
+                        // 해당 셀에 속한 완성된 단어들의 정답 여부 확인
+                        let cellBackgroundState = 'none'; // 'none', 'correct', 'incorrect'
+                        
+                        for (const word of wordsAtCell) {
+                            // 단어가 완성되었는지 확인
+                            let isWordCompleted = true;
+                            let isWordCorrect = true;
+                            
+                            for (let i = 0; i < word.word.length; i++) {
+                                const wordRow = word.direction === 'horizontal' ? word.startRow : word.startRow + i;
+                                const wordCol = word.direction === 'horizontal' ? word.startCol + i : word.startCol;
+                                const inputChar = playerGrid[wordRow][wordCol];
+                                
+                                if (!inputChar || inputChar === '') {
+                                    isWordCompleted = false;
+                                    break;
+                                }
+                                
+                                if (inputChar !== word.word[i]) {
+                                    isWordCorrect = false;
+                                }
+                            }
+                            
+                            // 완성된 단어가 있으면 배경 상태 결정
+                            if (isWordCompleted) {
+                                if (isWordCorrect) {
+                                    cellBackgroundState = 'correct';
+                                } else if (cellBackgroundState !== 'correct') {
+                                    cellBackgroundState = 'incorrect';
+                                }
+                            }
+                        }
+                        
+                        let bgColor = 'white';
+                        let borderColor = '#333';
+                        
+                        // 배경 색상을 완성된 단어의 정답 여부에 따라 결정
+                        if (cellBackgroundState === 'correct') {
+                            bgColor = '#c8e6c9';
+                            borderColor = '#4caf50';
+                        } else if (cellBackgroundState === 'incorrect') {
+                            bgColor = '#ffcdd2';
+                            borderColor = '#f44336';
+                        }
+                        
+                        cell.className = 'solve-grid-cell';
+                        cell.style.cssText = `
+                            width: var(--cell-size); height: var(--cell-size); 
+                            background: ${bgColor}; border: clamp(1px, 0.1vw, 2px) solid ${borderColor}; 
+                            display: flex; align-items: center; justify-content: center; 
+                            font-weight: bold; font-size: var(--cell-font-size); 
+                            transition: all 0.3s; position: relative; box-sizing: border-box;
+                            border-radius: clamp(2px, 0.3vw, 4px);
+                        `;
+                        
+                        // 해당 위치에서 시작하는 모든 단어 확인
+                        const wordsStartingHere = words.filter(word => 
+                            word.placed && word.startRow === row && word.startCol === col
+                        );
+                        
+                        // 가로 단어와 세로 단어 분리
+                        const horizontalWord = wordsStartingHere.find(word => word.direction === 'horizontal');
+                        const verticalWord = wordsStartingHere.find(word => word.direction === 'vertical');
+                        
+                        // 가로 단어 번호 표시 (파란색)
+                        if (horizontalWord) {
+                            const horizontalLabel = document.createElement('div');
+                            horizontalLabel.textContent = wordNumbers[horizontalWord.id]?.number || '?';
+                            horizontalLabel.style.cssText = `
+                                position: absolute; top: 0; left: 0; 
+                                background: #2196F3; color: white; 
+                                font-size: var(--cell-number-size); line-height: 1.1; 
+                                padding: var(--label-padding); 
+                                border-radius: 0 0 var(--label-border-radius) 0; 
+                                font-weight: bold; z-index: 10;
+                                min-width: var(--label-min-width); text-align: center;
+                            `;
+                            cell.appendChild(horizontalLabel);
+                        }
+                        
+                        // 세로 단어 번호 표시 (빨간색)
+                        if (verticalWord) {
+                            const verticalLabel = document.createElement('div');
+                            verticalLabel.textContent = wordNumbers[verticalWord.id]?.number || '?';
+                            verticalLabel.style.cssText = `
+                                position: absolute; top: 0; ${horizontalWord ? 'left: var(--label-offset);' : 'left: 0;'} 
+                                background: #f44336; color: white; 
+                                font-size: var(--cell-number-size); line-height: 1.1; 
+                                padding: var(--label-padding); 
+                                border-radius: 0 0 var(--label-border-radius) 0; 
+                                font-weight: bold; z-index: 10;
+                                min-width: var(--label-min-width); text-align: center;
+                            `;
+                            cell.appendChild(verticalLabel);
+                        }
+                        
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.value = playerGrid[row][col] || '';
+                        input.style.cssText = 'width: 100%; height: 100%; border: none; outline: none; background: transparent; text-align: center; font-weight: bold; font-size: var(--cell-font-size); ime-mode: active; caret-color: transparent; cursor: text; box-sizing: border-box;';
+                        
+                        // 포커스 이벤트 - 세련된 효과 적용
+                        let blurTimeout;
+                        let keepFocused = false;
+                        
+                        const maintainFocus = () => {
+                            if (blurTimeout) {
+                                clearTimeout(blurTimeout);
+                                blurTimeout = null;
+                            }
+                            if (keepFocused) {
+                                input.focus();
+                                cell.classList.add('focused');
+                            }
+                        };
+                        
+                        input.addEventListener('focus', () => {
+                            keepFocused = true;
+                            maintainFocus();
+                        });
+                        
+                        input.addEventListener('blur', () => {
+                            // 더 긴 지연으로 연속 키보드 작업 지원 (150ms → 800ms)
+                            blurTimeout = setTimeout(() => {
+                                keepFocused = false;
+                                cell.classList.remove('focused');
+                                blurTimeout = null;
+                            }, 800);
+                        });
+                        
+                        // 모든 키보드 이벤트에서 포커스 유지
+                        input.addEventListener('keydown', (e) => {
+                            maintainFocus();
+                            
+                            // 키보드 작업 후 포커스 복원 (더 안정적으로)
+                            setTimeout(() => {
+                                if (keepFocused) {
+                                    maintainFocus();
+                                }
+                            }, 50);
+                        });
+                        
+                        input.addEventListener('keyup', () => {
+                            maintainFocus();
+                        });
+                        
+                        // IME(한글 입력) 이벤트에서도 포커스 유지
+                        input.addEventListener('compositionstart', () => {
+                            maintainFocus();
+                        });
+                        
+                        input.addEventListener('compositionupdate', () => {
+                            maintainFocus();
+                        });
+                        
+                        input.addEventListener('compositionend', () => {
+                            maintainFocus();
+                            // 한글 조합 완료 후 포커스 확실히 유지
+                            setTimeout(() => {
+                                if (keepFocused) {
+                                    maintainFocus();
+                                }
+                            }, 100);
+                        });
+                        
+                        // 셀 클릭 시 명확한 포커스 설정
+                        cell.addEventListener('click', () => {
+                            keepFocused = true;
+                            maintainFocus();
+                            input.select(); // 텍스트 선택으로 확실한 포커스
+                        });
+                        
+                        // 한글 입력 지원 개선
+                        let isComposing = false;
+                        
+                        input.addEventListener('compositionstart', () => {
+                            isComposing = true;
+                            // 포커스 유지
+                            setTimeout(() => {
+                                if (activeInputField === `${row}-${col}`) {
+                                    input.focus();
+                                }
+                            }, 1);
+                        });
+                        
+                        input.addEventListener('compositionend', (e) => {
+                            isComposing = false;
+                            let value = e.target.value;
+                            if (value.length > 0) {
+                                value = processInputValue(value);
+                            }
+                            e.target.value = value;
+                            handleInputChange(row, col, value);
+                            
+                            // 포커스 유지
+                            setTimeout(() => {
+                                if (activeInputField === `${row}-${col}`) {
+                                    e.target.focus();
+                                }
+                            }, 1);
+                        });
+                        
+                        input.addEventListener('input', (e) => {
+                            // 한글 조합 중이 아닐 때만 처리
+                            if (!isComposing) {
+                                let value = e.target.value;
+                                if (value.length > 0) {
+                                    value = processInputValue(value);
+                                }
+                                e.target.value = value;
+                                handleInputChange(row, col, value);
+                                
+                                // 포커스 유지
+                                setTimeout(() => {
+                                    if (activeInputField === `${row}-${col}`) {
+                                        e.target.focus();
+                                    }
+                                }, 1);
+                            }
+                        });
+                        
+                        input.addEventListener('keydown', (e) => {
+                            // 백스페이스/Delete로 삭제
+                            if (e.key === 'Backspace' || e.key === 'Delete') {
+                                e.target.value = '';
+                                handleInputChange(row, col, '');
+                            }
+                            
+                            // 포커스 유지
+                            setTimeout(() => {
+                                if (activeInputField === `${row}-${col}`) {
+                                    e.target.focus();
+                                }
+                            }, 1);
+                        });
+                        
+                        // 입력 필드 클릭 시 포커스 유지
+                        input.addEventListener('click', (e) => {
+                            e.stopPropagation(); // 이벤트 버블링 방지
+                            e.target.focus();
+                            e.target.select(); // 기존 텍스트 선택
+                            activeInputField = `${row}-${col}`;
+                        });
+                        
+                        // 셀에 data-cell 속성 추가
+                        cell.setAttribute('data-cell', `${row}-${col}`);
+                        
+                        // 셀 클릭 시 입력 필드에 포커스
+                        cell.addEventListener('click', (event) => {
+                            if (mode === 'solve') {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                
+                                // 이전 활성 입력 필드의 포커스 해제
+                                if (activeInputField && activeInputField !== `${row}-${col}`) {
+                                    const prevElement = document.querySelector(`[data-cell="${activeInputField}"] input`);
+                                    if (prevElement) {
+                                        prevElement.blur();
+                                    }
+                                }
+                                
+                                setTimeout(() => {
+                                    input.focus();
+                                    input.select();
+                                    activeInputField = `${row}-${col}`;
+                                    
+                                    // 입력 필드 스타일 강화
+                                    input.style.caretColor = '#2563eb';
+                                    input.style.outline = 'none';
+                                    input.style.border = 'none';
+                                }, 10);
+                            }
+                        });
+                        
+                        cell.appendChild(input);
+                    }
+                    
+                    gridElement.appendChild(cell);
+                }
+            }
+        }
+
+        function updateSolveGridDisplay() {
+            if (mode === 'solve') {
+                showSolveMode();
+            }
+        }
+
+        function resetPlayerGrid() {
+            playerGrid = Array(gridSize.rows).fill(null).map(() => Array(gridSize.cols).fill(''));
+            completedWords = new Set();
+            missionCompleted = false;
+            updateSolveGridDisplay();
+        }
+        
+        // 키보드 단축키
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && e.target.id === 'wordInput') {
+                addWord();
+            }
+        });
+        
+        // 🌐 Supabase 기반 URL 파라미터 처리 (폴백 지원)
+        window.addEventListener('load', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const codeFromUrl = urlParams.get('code');
+            
+            if (codeFromUrl) {
+                // 로딩 표시
+                const loadingDiv = document.createElement('div');
+                loadingDiv.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(255,255,255,0.95); z-index: 9999; 
+                    display: flex; align-items: center; justify-content: center;
+                `;
+                loadingDiv.innerHTML = `
+                    <div style="text-align: center;">
+                        <div style="color: #2196F3; font-size: 24px; font-weight: bold; margin-bottom: 15px;">
+                            🔍 퀴즈 로딩 중...
+                        </div>
+                        <div style="color: #666; font-size: 16px;">
+                            퀴즈 코드: ${codeFromUrl}
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(loadingDiv);
+                
+                // Supabase에서 퀴즈 로드
+                (async () => {
+                    try {
+                        // Supabase에서 퀴즈 데이터 가져오기
+                        const quizData = await loadQuizFromSupabase(codeFromUrl.toUpperCase());
+                        
+                        // 로딩창 제거
+                        if (loadingDiv.parentNode) {
+                            document.body.removeChild(loadingDiv);
+                        }
+                        
+                        // 🔒 공유받은 퀴즈 상태로 설정 (보안 격리)
+                        isSharedQuizMode = true;
+                        sharedQuizData = { ...quizData };
+                        
+                        // 퀴즈 데이터 로드 (읽기 전용)
+                        words = quizData.words || [];
+                        grid = quizData.grid || Array(10).fill(null).map(() => Array(10).fill(''));
+                        gridSize = quizData.gridSize || { rows: 10, cols: 10 };
+                        
+                        // 🚨 제작모드 데이터 격리
+                        const originalTitle = document.getElementById('quizTitle');
+                        if (originalTitle) {
+                            originalTitle.value = ''; // 제작모드용 제목은 비워둠
+                        }
+                        
+                        // 풀이 모드로 전환
+                        mode = 'solve';
+                        playerGrid = Array(gridSize.rows).fill(null).map(() => Array(gridSize.cols).fill(''));
+                        completedWords = new Set();
+                        missionCompleted = false;
+                        
+                        // 단어 번호 생성
+                        wordNumbers = generateWordNumbers(words);
+                        
+                        // 풀이 모드 화면 표시
+                        showSolveMode();
+                        
+                        // 사용자에게 알림
+                        setTimeout(() => {
+                            alert(`🎮 "${quizData.title || '낱말퀴즈'}" 로드 완료!\n즐거운 퀴즈 시간 되세요! 🧩`);
+                        }, 500);
+                        
+                    } catch (error) {
+                        // 로딩창 제거
+                        if (loadingDiv.parentNode) {
+                            document.body.removeChild(loadingDiv);
+                        }
+                        
+                        console.error('❌ 퀴즈 로드 오류:', error);
+                        
+                        // 사용자 친화적인 오류 메시지
+                        let errorMessage = '❌ 퀴즈를 불러올 수 없습니다.\n\n';
+                        
+                        if (error.message && error.message.includes('Failed to fetch')) {
+                            errorMessage += '🌐 인터넷 연결을 확인하고 다시 시도해주세요.';
+                        } else if (error.message && error.message.includes('퀴즈 코드를 찾을 수 없습니다')) {
+                            errorMessage += '📝 퀴즈 코드를 다시 확인해주세요.';
+                        } else if (error.message && error.message.includes('퀴즈 데이터가 비어있습니다')) {
+                            errorMessage += '📄 퀴즈 데이터에 문제가 있습니다.\n퀴즈 제작자에게 문의해주세요.';
+                        } else if (error.message && error.message.includes('초기화')) {
+                            errorMessage += '🔧 페이지를 새로고침하고 다시 시도해주세요.';
+                        } else {
+                            errorMessage += '🔄 잠시 후 다시 시도해주세요.';
+                        }
+                        
+                        alert(errorMessage);
+                    }
+                })();
+                
+            } else {
+                // 일반 접속 시 제작모드로 시작
+                isSharedQuizMode = false;
+                sharedQuizData = null;
+            }
+        });
+        
+        console.log('✅ 가로세로 낱말퀴즈 놀이터가 성공적으로 로드되었습니다!');
+
+        async function saveQuiz() {
+            const placedWords = words.filter(w => w.placed);
+            
+            if (placedWords.length === 0) {
+                alert('단어를 먼저 배치하세요!');
+                return null;
+            }
+            
+            const quizTitle = document.getElementById('quizTitle').value;
+            if (!quizTitle.trim()) {
+                alert('퀴즈 제목을 입력하세요!');
+                return null;
+            }
+            
+            // 더 고유한 퀴즈 코드 생성 (시간 + 랜덤)
+            const timestamp = Date.now().toString(36).toUpperCase();
+            const random = Math.random().toString(36).substr(2, 4).toUpperCase();
+            const code = (timestamp + random).substr(-8);
+            
+            const quizData = {
+                title: quizTitle,
+                words: placedWords,
+                grid: grid,
+                gridSize: gridSize,
+                code: code,
+                createdAt: new Date().toISOString(),
+                version: '3.1' // 단순화 버전
+            };
+            
+            // Supabase에 저장
+            try {
+                await saveQuizToSupabase(quizData);
+                
+                return {
+                    code: code,
+                    quizData: quizData
+                };
+            } catch (error) {
+                // Supabase 저장 실패 시 오류를 다시 던져서 상위에서 처리
+                throw error;
+            }
+        }
+
+        function shareQuiz() {
+            if (words.length === 0) {
+                alert('단어를 먼저 추가하세요!');
+                return;
+            }
+            
+            // 로딩 표시
+            const loadingAlert = document.createElement('div');
+            loadingAlert.style.cssText = `
+                position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                z-index: 2000; text-align: center; min-width: 200px;
+            `;
+            loadingAlert.innerHTML = `
+                <div style="color: #2196F3; font-weight: bold; margin-bottom: 10px;">💾 퀴즈 저장 중...</div>
+                <div style="color: #666; font-size: 14px;">잠시만 기다려주세요...</div>
+            `;
+            document.body.appendChild(loadingAlert);
+            
+            // 비동기 처리로 공유창 표시
+            (async () => {
+                try {
+                    // 퀴즈 저장 및 코드 생성
+                    const result = await saveQuiz();
+                    
+                    // 로딩창 제거
+                    if (loadingAlert && loadingAlert.parentNode) {
+                        document.body.removeChild(loadingAlert);
+                    }
+                    
+                    // result가 null이면 저장이 취소된 것이므로 조용히 종료
+                    if (!result || !result.code) {
+                        return;
+                    }
+                    
+                    // 공유창 표시
+                    showShareModal(result.code, result.quizData);
+                    
+                } catch (error) {
+                    // 로딩창 제거
+                    if (loadingAlert && loadingAlert.parentNode) {
+                        document.body.removeChild(loadingAlert);
+                    }
+                    
+                    console.error('❌ 공유 처리 오류:', error);
+                    
+                    // 사용자 친화적인 오류 메시지
+                    let errorMessage = '❌ 퀴즈 저장에 실패했습니다.\n\n';
+                    
+                    if (error.message && error.message.includes('Failed to fetch')) {
+                        errorMessage += '🌐 인터넷 연결을 확인하고 다시 시도해주세요.';
+                    } else if (error.message && error.message.includes('초기화')) {
+                        errorMessage += '🔧 페이지를 새로고침하고 다시 시도해주세요.';
+                    } else if (error.message && error.message.includes('duplicate')) {
+                        errorMessage += '🔄 잠시 후 다시 시도해주세요.';
+                    } else {
+                        errorMessage += '🔄 잠시 후 다시 시도해주세요.';
+                    }
+                    
+                    alert(errorMessage);
+                }
+            })();
+        }
+        
+        // 공유 모달 표시 함수
+        function showShareModal(code, quizData) {
+            // 🌐 Supabase 기반 공유 URL 생성
+            const shareUrl = generateShareUrl(code);
+            
+            // 공유 모달 생성
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.7); z-index: 1000; display: flex;
+                justify-content: center; align-items: flex-start; padding: 20px; box-sizing: border-box;
+                overflow-y: auto; padding-top: 50px; padding-bottom: 50px;
+            `;
+            
+            modal.innerHTML = `
+                <div style="background: white; border-radius: 20px; padding: 30px; max-width: 500px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.3); text-align: center; position: relative; max-height: 80vh; overflow-y: auto;">
+                    <button onclick="this.closest('div').parentElement.remove()" style="position: absolute; top: 15px; right: 20px; background: none; border: none; font-size: 24px; cursor: pointer; color: #999; z-index: 10; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">×</button>
+                    
+                    <h2 style="text-align: center; color: #2196F3; margin-bottom: 20px;">🎮 퀴즈 공유하기</h2>
+                    <p style="color: #666; margin-bottom: 25px;">내가 만든 퀴즈를 공유해보세요!</p>
+                    
+                    <!-- QR 코드 섹션 -->
+                    <div style="background: #f8f9fa; border-radius: 15px; padding: 20px; margin-bottom: 25px;">
+                        <h3 style="color: #333;">📱 QR 코드 공유</h3>
+                        <div style="display: flex; justify-content: center; margin: 15px 0;">
+                            <canvas id="qrcode-canvas" style="border: 2px solid #e0e0e0; border-radius: 10px;"></canvas>
+                        </div>
+                        <p style="color: #666; font-size: 14px;">📱 QR 코드 스캔으로 즉시 접속!</p>
+                    </div>
+                    
+                    <!-- URL 링크 섹션 -->
+                    <div style="background: #fff3cd; border-radius: 15px; padding: 20px; margin-bottom: 25px;">
+                        <h3 style="color: #856404; margin-bottom: 15px; text-align: center;">🌐 URL 링크 공유</h3>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="text" id="share-url-input" value="${shareUrl}" readonly 
+                                style="flex: 1; padding: 12px; border: 2px solid #ffeaa7; border-radius: 8px; font-size: 12px; background: white; word-break: break-all;">
+                            <button onclick="copyShareUrl()" style="background: #f39c12; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap;">
+                                📋 복사
+                            </button>
+                        </div>
+                        <p style="color: #856404; font-size: 12px; margin-top: 10px;">☁️ 클라우드에 저장되어 누구든 접속 가능!</p>
+                    </div>
+                    
+                    <!-- 퀴즈 코드 섹션 -->
+                    <div style="background: #d1ecf1; border-radius: 15px; padding: 20px;">
+                        <h3 style="color: #0c5460; margin-bottom: 15px; text-align: center;">🎯 퀴즈 코드 공유</h3>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="text" id="quiz-code-input" value="${code}" readonly 
+                                style="flex: 1; padding: 12px; border: 2px solid #bee5eb; border-radius: 8px; font-size: 16px; font-weight: bold; text-align: center; background: white; font-family: monospace;">
+                            <button onclick="copyQuizCode()" style="background: #17a2b8; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap;">
+                                📋 복사
+                            </button>
+                        </div>
+                        <p style="color: #0c5460; font-size: 12px; margin-top: 10px;">💡 풀이 모드 → 코드 입력으로 퀴즈 플레이 가능</p>
+                    </div>
+                    
+                    <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                        <p style="color: #999; font-size: 12px;">🎯 <strong>퀴즈 제목:</strong> ${document.getElementById('quizTitle').value || '무제'}</p>
+                        <p style="color: #999; font-size: 12px;">📝 <strong>단어 개수:</strong> ${words.length}개</p>
+                        <p style="color: #2196F3; font-size: 12px; margin-top: 10px; text-align: center;"><strong>☁️ 클라우드 저장:</strong> 퀴즈 데이터가 안전하게 저장되어 누구든 접속 가능!</p>
+                    </div>
+                </div>
+            `;
+            
+            // 모달을 body에 추가
+            document.body.appendChild(modal);
+            
+            // URL 복사 함수들을 전역으로 설정
+            window.copyShareUrl = function() {
+                const input = document.getElementById('share-url-input');
+                input.select();
+                input.setSelectionRange(0, 99999);
+                
+                try {
+                    navigator.clipboard.writeText(shareUrl).then(() => {
+                        alert('✅ URL 복사됨! 🔗');
+                    });
+                } catch (err) {
+                    document.execCommand('copy');
+                    alert('✅ URL 복사됨! 🔗');
+                }
+            };
+            
+            window.copyQuizCode = function() {
+                const input = document.getElementById('quiz-code-input');
+                input.select();
+                input.setSelectionRange(0, 99999);
+                
+                try {
+                    navigator.clipboard.writeText(code).then(() => {
+                        alert('✅ 코드 복사됨! 🎯');
+                    });
+                } catch (err) {
+                    document.execCommand('copy');
+                    alert('✅ 코드 복사됨! 🎯');
+                }
+            };
+            
+            // QR코드 생성 (개선된 버전)
+            function tryGenerateQR() {
+                console.log('🔄 QR코드 생성 시작...');
+                console.log('🎯 공유 URL:', shareUrl);
+                
+                const canvas = document.getElementById('qrcode-canvas');
+                
+                if (!canvas) {
+                    console.error('❌ QR 코드 캔버스를 찾을 수 없습니다');
+                    return;
+                }
+                
+                // Google Charts API를 사용한 QR 코드 생성
+                window.generateQRCode(shareUrl, canvas, {
+                    width: 160,
+                    margin: 2,
+                    color: {
+                        dark: '#1976D2',
+                        light: '#FFFFFF'
+                    },
+                    onSuccess: function() {
+                        console.log('✅ QR 코드 생성 성공!');
+                        console.log('📱 QR 코드를 스캔하면 자동으로 퀴즈가 로드됩니다');
+                    },
+                    onError: function(error) {
+                        console.error('❌ QR코드 생성 오류:', error);
+                        // 오류 시 기본 텍스트 표시
+                        canvas.style.display = 'none';
+                        canvas.parentElement.innerHTML = `
+                            <div style="text-align: center; color: #666; font-size: 12px; padding: 20px;">
+                                <p>⚠️ QR 코드 생성 실패</p>
+                                <p style="margin-top: 10px;">URL 링크나 퀴즈 코드를 사용해주세요</p>
+                                <div style="margin-top: 15px; font-size: 11px; color: #999;">
+                                    <p>🌐 인터넷 연결을 확인해주세요</p>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+            }
+            
+            // QR 코드 생성 시작
+            setTimeout(() => tryGenerateQR(), 100);
+            
+            // 모달 클릭 시 닫기 (모달 배경 클릭)
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
+        }
+
+        // 🌐 Supabase 기반 크로스 디바이스 퀴즈 공유 시스템
+        
+                // Supabase 클라이언트 초기화
+        const SUPABASE_URL = 'https://ecgrscpspkruypnbtlsu.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjZ3JzY3BzcGtydXlwbmJ0bHN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5MjMwNTgsImV4cCI6MjA2ODQ5OTA1OH0.2vQSeaySO7rMvpRBNFH7w3IeIwVgRwiKqfk58kP2cA8';
+        
+        // Supabase 클라이언트 생성 (안전한 초기화)
+        let supabase;
+        
+        // 페이지 로드 후 Supabase 초기화
+        function initializeSupabase() {
+            try {
+                if (typeof window.supabase === 'undefined') {
+                    throw new Error('Supabase 라이브러리가 로드되지 않았습니다');
+                }
+                
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                    auth: {
+                        persistSession: false,
+                        autoRefreshToken: false
+                    }
+                });
+                
+                console.log('✅ Supabase 클라이언트 초기화 완료');
+                return true;
+            } catch (error) {
+                console.error('❌ Supabase 초기화 실패:', error);
+                return false;
+            }
+        }
+
+
+        
+        // Supabase에 퀴즈 저장
+        async function saveQuizToSupabase(quizData) {
+            console.log('💾 Supabase 저장 시작:', quizData.code);
+            
+            // Supabase 초기화 확인
+            if (!supabase) {
+                const initialized = initializeSupabase();
+                if (!initialized) {
+                    throw new Error('Supabase 초기화 실패');
+                }
+            }
+            
+            try {
+                // 먼저 같은 코드가 있는지 확인
+                const { data: existing } = await supabase
+                    .from('quizzes')
+                    .select('quiz_code')
+                    .eq('quiz_code', quizData.code)
+                    .single();
+                
+                if (existing) {
+                    // 기존 퀴즈 업데이트
+                    const { data, error } = await supabase
+                        .from('quizzes')
+                        .update({
+                            title: quizData.title,
+                            quiz_data: quizData,
+                            created_at: new Date().toISOString()
+                        })
+                        .eq('quiz_code', quizData.code);
+                    
+                    if (error) throw error;
+                    console.log('✅ Supabase 업데이트 성공:', quizData.code);
+                } else {
+                    // 새 퀴즈 생성
+                    const { data, error } = await supabase
+                        .from('quizzes')
+                        .insert([{
+                            quiz_code: quizData.code,
+                            title: quizData.title,
+                            quiz_data: quizData,
+                            created_at: new Date().toISOString()
+                        }]);
+                    
+                    if (error) throw error;
+                    console.log('✅ Supabase 저장 성공:', quizData.code);
+                }
+                
+                return { success: true };
+                
+            } catch (error) {
+                console.error('❌ Supabase 저장 실패:', error);
+                console.error('상세 오류:', {
+                    message: error.message,
+                    details: error.details,
+                    hint: error.hint,
+                    code: error.code
+                });
+                throw error;
+            }
+        }
+        
+        // Supabase에서 퀴즈 로드
+        async function loadQuizFromSupabase(code) {
+            console.log('🔍 Supabase 로드 시작:', code);
+            
+            // Supabase 초기화 확인
+            if (!supabase) {
+                const initialized = initializeSupabase();
+                if (!initialized) {
+                    throw new Error('Supabase 초기화 실패');
+                }
+            }
+            
+            try {
+                const { data, error } = await supabase
+                    .from('quizzes')
+                    .select('quiz_data')
+                    .eq('quiz_code', code)
+                    .single();
+                
+                if (error) {
+                    console.error('❌ Supabase 로드 실패:', error);
+                    console.error('상세 오류:', {
+                        message: error.message,
+                        details: error.details,
+                        hint: error.hint,
+                        code: error.code
+                    });
+                    
+                    if (error.code === 'PGRST116') {
+                        throw new Error('퀴즈 코드를 찾을 수 없습니다');
+                    }
+                    throw error;
+                }
+                
+                if (!data || !data.quiz_data) {
+                    throw new Error('퀴즈 데이터가 비어있습니다');
+                }
+                
+                console.log('✅ Supabase 로드 성공:', data.quiz_data.title);
+                return data.quiz_data;
+                
+            } catch (error) {
+                if (error.message.includes('퀴즈')) {
+                    throw error; // 이미 처리된 오류는 그대로 전달
+                }
+                console.error('❌ 예상치 못한 로드 오류:', error);
+                throw new Error('서버 연결에 문제가 발생했습니다');
+            }
+        }
+        
+        // 간단한 공유 URL 생성
+        function generateShareUrl(code) {
+            const baseUrl = window.location.href.split('?')[0];
+            const shareUrl = `${baseUrl}?code=${code}`;
+            
+            return shareUrl;
+        }
+        
+        // 🔧 디버깅용: Supabase 연결 테스트 (개발자 도구에서 실행)
+        window.testSupabase = async function() {
+            try {
+                console.log('🔧 Supabase 연결 테스트 시작...');
+                console.log('📋 URL:', SUPABASE_URL);
+                
+                // Supabase 초기화 확인
+                if (!supabase) {
+                    console.log('🔄 Supabase 초기화 중...');
+                    const initialized = initializeSupabase();
+                    if (!initialized) {
+                        console.error('❌ Supabase 초기화 실패');
+                        return false;
+                    }
+                }
+                
+                // 연결 테스트
+                const { data, error } = await supabase
+                    .from('quizzes')
+                    .select('id')
+                    .limit(1);
+                
+                if (error) {
+                    console.error('❌ 연결 실패:', error);
+                    console.error('상세 정보:', {
+                        message: error.message,
+                        details: error.details,
+                        hint: error.hint,
+                        code: error.code
+                    });
+                    return false;
+                }
+                
+                console.log('✅ Supabase 연결 성공!');
+                console.log('📊 조회된 데이터:', data);
+                return true;
+                
+            } catch (error) {
+                console.error('❌ 연결 오류:', error);
+                return false;
+            }
+        };
+        
+        // 페이지 로드 완료 시 Supabase 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 페이지 로드 완료, Supabase 초기화 중...');
+            initializeSupabase();
+        });
+        
+
+        
+
+    </script>
+</body>
+</html> 
