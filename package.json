@@ -1,0 +1,36 @@
+{
+  "name": "crossword-maker",
+  "version": "1.0.0",
+  "description": "가로세로 낱말퀴즈 제작기 - 교사용 퀴즈 제작 및 학생용 풀이 도구 (Vanilla JS)",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx http-server . -p 3000 -o",
+    "serve": "python -m http.server 3000",
+    "deploy": "echo '배포 준비 완료! index.html 파일을 웹 서버에 업로드하세요.'"
+  },
+  "keywords": [
+    "crossword",
+    "교육",
+    "퀴즈",
+    "낱말퀴즈",
+    "교사",
+    "학생",
+    "웹앱",
+    "vanilla-js"
+  ],
+  "author": "CrosswordMaker Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/crossword-maker.git"
+  },
+  "homepage": "https://your-username.github.io/crossword-maker",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ]
+} 
